@@ -1,0 +1,24 @@
+meta
+{
+	title: "cellid";
+	description: "style displaying OpenCellID measurements";
+	author: "Kolesár András";
+	version: "0.0.0.1";
+	link: "http://terkep.turistautak.hu";
+}
+
+node[cellid] {
+	symbol-fill-color: #808080;
+}
+
+node[cellid=~/1$/] {
+	symbol-fill-color: #ff0000;
+}
+
+node[cellid=~/2$/] {
+	symbol-fill-color: #00ff00;
+}
+
+node[cellid=~/3$/] {
+	symbol-fill-color: #0000ff;
+}

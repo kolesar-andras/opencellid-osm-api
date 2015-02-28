@@ -1,0 +1,19 @@
+{
+    "name": "kolesar-andras/opencellid-osm-api",
+    "description": "OSM API OpenCellID mérések számára",
+    "license": "GNU GPL",
+    "authors": [
+        {
+            "name": "Kolesár András",
+            "email": "kolesar@turistautak.hu"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+    },
+	"autoload": {
+		"psr-4": {
+			"": "src"
+		}
+	}
+}

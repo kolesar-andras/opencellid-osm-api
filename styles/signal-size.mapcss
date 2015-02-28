@@ -1,0 +1,29 @@
+meta
+{
+	title: "signal-size";
+	description: "style displaying OpenCellID measurements";
+	author: "Kolesár András";
+	version: "0.0.0.1";
+	link: "http://terkep.turistautak.hu";
+}
+
+node[rssi>-75] {
+	symbol-size: 6;
+}
+
+node[rssi>-70] {
+	symbol-size: 8;
+}
+
+node[rssi>-65] {
+	symbol-size: 10;
+}
+
+node[rssi>-60] {
+	symbol-size: 12;
+}
+
+node[rssi>-50] {
+	symbol-size: 14;
+}
+

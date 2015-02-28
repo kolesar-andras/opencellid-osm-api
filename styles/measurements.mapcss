@@ -1,0 +1,69 @@
+meta
+{
+	title: "measurements";
+	description: "style displaying OpenCellID measurements";
+	author: "Kolesár András";
+	version: "0.0.0.2";
+	link: "http://terkep.turistautak.hu";
+}
+
+node[mcc] {
+	symbol-stroke-opacity: 0.1;
+	symbol-stroke-color: #ffffff;
+	symbol-size: 4;
+	symbol-fill-opacity: 0.3;
+}
+
+node[mcc=216][mnc=1] { symbol-fill-color: #00a9e3; }
+node[mcc=216][mnc=30] { symbol-fill-color: #000000; /* e20074 */ }
+node[mcc=216][mnc=70] { symbol-fill-color: #d5030b; }
+
+node[man_made],
+node[location] {
+	icon-image: "http://kolesar.turistautak.hu/osm/styles/images/tower-gray.png";
+	z-index: 2;
+}
+
+node[communication:mobile_phone][communication:mobile_phone != no] {
+	icon-image: "http://kolesar.turistautak.hu/osm/styles/images/tower-red.png";
+	text: operator;
+	z-index: 2;
+}
+
+node[communication:mobile_phone][communication:mobile_phone != no][man_made],
+node[communication:mobile_phone][communication:mobile_phone != no][location] {
+	icon-image: "http://kolesar.turistautak.hu/osm/styles/images/tower-white.png";
+}
+
+node[communication:mobile_phone=no] {
+	icon-image: "http://kolesar.turistautak.hu/osm/styles/images/tower-black.png";
+}
+
+node[communication:mobile_phone][man_made][gsm:cellid],
+node[communication:mobile_phone][man_made][umts:cellid],
+node[communication:mobile_phone][location][gsm:cellid],
+node[communication:mobile_phone][location][umts:cellid] {
+	icon-image: "http://kolesar.turistautak.hu/osm/styles/images/tower-green.png";
+	text: operator;
+}
+
+node["[count]"] {
+	symbol-shape: circle;
+	symbol-stroke-opacity: 1.0;
+	symbol-stroke-width: 1.5;
+	symbol-stroke-color: #ffffff;
+	symbol-size: 4;
+	symbol-fill-opacity: 1.0;
+	z-index: 1;
+	text: cellid;
+	font-size: 8;
+}
+
+node["[count]"][cid] {
+	text: cid;
+}
+
+way[fixme] {
+	dashes: 8, 8;
+	width: 2;
+}
