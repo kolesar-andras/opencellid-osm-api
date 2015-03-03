@@ -12,7 +12,7 @@ include_once('include/postgresql.conf.php');
 
 ini_set('display_errors', 1);
 ini_set('max_execution_time', 1800);
-ini_set('memory_limit', '512M');
+ini_set('memory_limit', '1024M');
 mb_internal_encoding('UTF-8');
 
 $operators = array(
@@ -21,12 +21,55 @@ $operators = array(
 	'70' => 'Vodafone',
 );
 
+$fields = array(
+	'gsm:cellid' => 'gsm',
+	'umts:cellid' => 'umts',
+);
+
 try {
-
-	$pg = pg_connect(PG_CONNECTION_STRING);
-
 	$osm = new OSM;
 	$osm->bbox(@$_REQUEST['bbox']);
+
+	$cellids = array();
+	$cellids_by_node = array();
+	$overpass = Overpass::query($osm->bbox);
+	$osm->merge($overpass);
+
+	$xml = simplexml_load_string($overpass);
+	foreach ($xml->node as $node) {
+		$n = $node->attributes();
+		$tags = array();
+		foreach ($node->tag as $tag) {
+			$t = $tag->attributes();
+			$tags[(string) $t['k']] = (string) $t['v'];
+		}
+
+		foreach ($fields as $key => $field) {
+			if (isset($tags[$key]) &&
+				isset($tags['MCC']) &&
+				isset($tags['MNC'])) {
+
+				$ops = explode(' ', $tags[$key]);
+				$mcc = $tags['MCC'];
+				$mncs =  explode(';', $tags['MNC']);
+				if (count($ops) == count($mncs)) {
+					foreach ($mncs as $i => $mnc) {
+						$mnc = sprintf('%02d', trim($mnc));
+						$cidlist = $ops[$i];
+						$cids = explode(';', $cidlist);
+						foreach ($cids as $cid) {
+							$cid = trim($cid);
+							if ($cid == '') continue;
+							$cellids[$mcc][$mnc][$field][$cid] = (string) $n['id'];
+							$cellids_by_node[(string) $n['id']][$mcc][$mnc][$field][] = $cid;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	$pg = pg_connect(PG_CONNECTION_STRING);
 
 	if ($osm->bbox) {
 		$where = sprintf("WHERE g && ST_Envelope(ST_GeomFromText(
@@ -62,6 +105,7 @@ try {
 		unset($tags['created']);
 		unset($tags['signal']);
 		unset($tags['site']);
+		unset($tags['cell']);
 
 		$tags['measured'] = gmdate('Y-m-d\TH:i:s\Z', substr($row['measured'], 0, -3));
 		$tags['rssi'] = rssi($row['signal']);
@@ -94,7 +138,7 @@ try {
 		$osm->nodes[] = $node;
 
 		$id = sprintf('%03d %02d %05d', $tags['mcc'], $tags['mnc'], $cid);
-		$weight = $tags['rssi'] + 60;
+		$weight = $tags['rssi'] + 90;
 		if ($weight>0) {
 			@$cells[$id]['lat'] += $lat * $weight;
 			@$cells[$id]['lon'] += $lon * $weight;
@@ -112,6 +156,14 @@ try {
 
 		$lat = $cell['lat'] / $cell['weight'];
 		$lon = $cell['lon'] / $cell['weight'];
+
+		if ($osm->bbox) {
+			$clon = ($osm->bbox[0]+$osm->bbox[2])/2;
+			$clat = ($osm->bbox[1]+$osm->bbox[3])/2;
+
+			// ha nagyon távoli rokont talált, azt hagyjuk (Telekom)
+			if (distance($lat, $lon, $lat, $clon) > 10000) continue;
+		}
 
 		$node = new Node($lat, $lon);
 		$node->tags = array(
@@ -138,7 +190,6 @@ try {
 		@$locations[$id]['count'] ++;
 		@$locations[$id]['nodes'][] = $node;
 
-
 	}
 
 	foreach ($locations as $id => $location) {
@@ -150,32 +201,35 @@ try {
 		$node = new Node($lat, $lon);
 		$node->id = '8' . str_replace(' ', '', $id);
 		$node->attr['version'] = '9999';
-		$osm->nodes[] = $node;
 
-		$cellids = array();
+		$nodeid = null;
 		foreach ($location['nodes'] as $cell) {
 			$osm->nodes[] = $cell;
-
-			$way = new Way;
-			$way->id = $cell->id;
-			$way->attr['version'] = '9999';
-			$way->addNode($node);
-			$way->addNode($cell);
-			$way->tags = $cell->tags;
-			$osm->ways[] = $way;
-
-			if (isset($cell->tags['cid'])) {
-				$node->tags['umts:cellid'][] = $cell->tags['cid'];
-				$node->tags['umts:LAC'] = $cell->tags['lac'];
-				$node->tags['umts:RNC'] = $cell->tags['rnc'];
-			} else {
-				$node->tags['gsm:cellid'][] = $cell->tags['cellid'];
-				$node->tags['gsm:LAC'] = $cell->tags['lac'];
-			}
 
 			$node->tags['MCC'] = $cell->tags['mcc'];
 			$node->tags['MNC'] = sprintf('%02d', $cell->tags['mnc']);
 			$node->tags['operator'] = $operators[$node->tags['MNC']];
+
+			if (isset($cell->tags['cid'])) {
+				$nodeid = @$cellids
+					[$node->tags['MCC']]
+					[$node->tags['MNC']]
+					['umts']
+					[$cell->tags['cid']];
+
+				$node->tags['umts:cellid'][] = $cell->tags['cid'];
+				$node->tags['umts:LAC'] = $cell->tags['lac'];
+				$node->tags['umts:RNC'] = $cell->tags['rnc'];
+			} else {
+				$nodeid = @$cellids
+					[$node->tags['MCC']]
+					[$node->tags['MNC']]
+					['gsm']
+					[$cell->tags['cellid']];
+
+				$node->tags['gsm:cellid'][] = $cell->tags['cellid'];
+				$node->tags['gsm:LAC'] = $cell->tags['lac'];
+			}
 
 			$comm = array();
 			if (isset($node->tags['gsm:cellid'])) $comm[] = 'gsm';
@@ -184,15 +238,53 @@ try {
 
 		}
 
-		foreach ($node->tags as $k => $v) {
-			if (is_array($v)) {
-				sort($v, SORT_NUMERIC);
-				$node->tags[$k] = implode(';', $v);
+		// ha találtunk meglevő osm pontot, akkor azt használjuk
+		if ($nodeid !== null) {
+			$node->id = $nodeid;
+			// a node megy a levesbe, nem tesszük a térképre
+
+			$cells_at_node = $cellids_by_node
+				[$nodeid]
+				[$node->tags['MCC']]
+				[$node->tags['MNC']];
+
+		} else {
+			foreach ($node->tags as $k => $v) {
+				if (is_array($v)) {
+					if (is_numeric($v[0])) {
+						sort($v, SORT_NUMERIC);
+					} else {
+						sort($v);
+					}
+					$node->tags[$k] = implode(';', $v);
+				}
 			}
+			$osm->nodes[] = $node;
 		}
+
+		// behúzzuk a vonalakat
+		foreach ($location['nodes'] as $cell) {
+			$way = new Way;
+			$way->id = $cell->id;
+			$way->attr['version'] = '9999';
+			$way->addNode($node);
+			$way->addNode($cell);
+
+			// ha meglevő node, akkor figyelmeztetjük az új cellákra
+			if ($nodeid !== null) {
+				$sys = $cell->tags['cid'] ? 'umts' : 'gsm';
+				$tag = $cell->tags['cid'] ? 'cid' : 'cellid';
+				if (!in_array($cell->tags[$tag], $cells_at_node[$sys])) {
+					$way->tags['fixme'] = 'new cell';
+				}
+			}
+
+			$way->tags = $cell->tags;
+			$osm->ways[] = $way;
+		}
+
 	}
 
-	// $osm->merge(Overpass::query($osm->bbox));
 	$osm->output();
 
 } catch (Exception $e) {
@@ -212,4 +304,22 @@ function cellid ($node1, $node2) {
 	if ($node1->tags['cellid']>$node2->tags['cellid']) return 1;
 	if ($node1->tags['cellid']<$node2->tags['cellid']) return -1;
 	return 0;
+}
+
+function distance ($lat1, $lon1, $lat2, $lon2) {
+
+	$R = 6371000;
+	$φ1 = $lat1 * pi() / 180;
+	$φ2 = $lat2 * pi() / 180;
+	$Δφ = ($lat2-$lat1) * pi() / 180;
+	$Δλ = ($lon2-$lon1) * pi() / 180;
+
+	$a = sin($Δφ/2) * sin($Δφ/2) +
+		    cos($φ1) * cos($φ2) *
+		    sin($Δλ/2) * sin($Δλ/2);
+	$c = 2 * atan2(sqrt($a), sqrt(1-$a));
+
+	$d = $R * $c;
+	return $d;
+
 }
