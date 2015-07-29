@@ -8,6 +8,9 @@
  *
  */
 
+// az alábbi fájl nem része a forráskódnak
+// valami ilyesmi legyen bennne:
+// define('PG_CONNECTION_STRING', 'host=localhost user=dummy password=secret');
 include_once('include/postgresql.conf.php');
 
 ini_set('display_errors', 1);
