@@ -21,11 +21,6 @@ $operators = array(
 	'70' => 'Vodafone',
 );
 
-$fields = array(
-	'gsm:cellid' => 'gsm',
-	'umts:cellid' => 'umts',
-);
-
 $nets = array(
 	2 => 'gsm',
 	3 => 'umts',
@@ -53,7 +48,8 @@ try {
 				$tags[(string) $t['k']] = (string) $t['v'];
 			}
 
-			foreach ($fields as $key => $field) {
+			foreach ($nets as $net) {
+				$key = $net . ':cellid';
 				if (isset($tags[$key]) &&
 					isset($tags['MCC']) &&
 					isset($tags['MNC'])) {
@@ -69,8 +65,8 @@ try {
 							foreach ($cids as $cid) {
 								$cid = trim($cid);
 								if ($cid == '') continue;
-								$cellids[$mcc][$mnc][$field][$cid] = (string) $n['id'];
-								$cellids_by_node[(string) $n['id']][$mcc][$mnc][$field][] = $cid;
+								$cellids[$mcc][$mnc][$net][$cid] = (string) $n['id'];
+								$cellids_by_node[(string) $n['id']][$mcc][$mnc][$net][] = $cid;
 							}
 						}
 					}
@@ -142,8 +138,8 @@ try {
 		}
 
 		$cid = isset($tags['cid']) ? $tags['cid'] : $tags['cellid'];
-		$net = $tags['tac'] ? 4 : ($tags['cid'] ? 3 : 2);
-		$tags['net'] = $nets[$net];
+		$tags['net'] = cellnet($tags);
+		$net = array_search($tags['net'], $nets); // ez így szám lesz
 		$lat = $row['lat'];
 		$lon = $row['lon'];
 
@@ -236,28 +232,19 @@ try {
 			$node->tags['MCC'] = $cell->tags['mcc'];
 			$node->tags['MNC'] = sprintf('%02d', $cell->tags['mnc']);
 			$node->tags['operator'] = $operators[$node->tags['MNC']];
+			$net = cellnet($cell->tags);
+			$key = cellkey($net);
 
 			$_nodeid = null;
-			if (isset($cell->tags['cid'])) {
-				$_nodeid = @$cellids
-					[$node->tags['MCC']]
-					[$node->tags['MNC']]
-					['umts']
-					[$cell->tags['cid']];
+			$_nodeid = @$cellids
+				[$node->tags['MCC']]
+				[$node->tags['MNC']]
+				[$net]
+				[$cell->tags[$key]];
 
-				$node->tags['umts:cellid'][] = $cell->tags['cid'];
-				$node->tags['umts:LAC'] = $cell->tags['lac'];
-				$node->tags['umts:RNC'] = $cell->tags['rnc'];
-			} else {
-				$_nodeid = @$cellids
-					[$node->tags['MCC']]
-					[$node->tags['MNC']]
-					['gsm']
-					[$cell->tags['cellid']];
-
-				$node->tags['gsm:cellid'][] = $cell->tags['cellid'];
-				$node->tags['gsm:LAC'] = $cell->tags['lac'];
-			}
+			$node->tags[$net . ':cellid'][] = $cell->tags[$key];
+			$node->tags[$net . ':LAC'] = $cell->tags['lac'];
+			$node->tags[$net . ':RNC'] = $cell->tags['rnc'];
 
 			// ha már volt választottunk és az más, mint amit most találtunk, ezt rögzítjük
 			if ($nodeid !== null && $_nodeid !== null && $nodeid = $_nodeid)
@@ -266,8 +253,8 @@ try {
 			if ($_nodeid !== null) $nodeid = $_nodeid;
 
 			$comm = array();
-			if (isset($node->tags['gsm:cellid'])) $comm[] = 'gsm';
-			if (isset($node->tags['umts:cellid'])) $comm[] = 'umts';
+			foreach ($nets as $net)
+				if (isset($node->tags[$net . ':cellid'])) $comm[] = $net;
 			$node->tags['communication:mobile_phone'] = $comm;
 
 		}
@@ -307,9 +294,9 @@ try {
 
 			// ha meglevő node, akkor figyelmeztetjük az új cellákra
 			if ($nodeid !== null) {
-				$sys = $cell->tags['cid'] ? 'umts' : 'gsm';
-				$tag = $cell->tags['cid'] ? 'cid' : 'cellid';
-				if (!in_array($cell->tags[$tag], $cells_at_node[$sys])) {
+				$net = cellnet($cell->tags);
+				$key = cellkey($net);
+				if (!in_array($cell->tags[$key], $cells_at_node[$net])) {
 					$way->tags['fixme'] = 'new cell';
 				}
 			}
@@ -340,6 +327,37 @@ function cellid ($node1, $node2) {
 	if ($node1->tags['cellid']>$node2->tags['cellid']) return 1;
 	if ($node1->tags['cellid']<$node2->tags['cellid']) return -1;
 	return 0;
+}
+
+function cellnet ($tags) {
+	global $nets;
+
+	if (@$tags['net'] != '' &&
+		in_array(strtolower($tags['net']), $nets)) {
+		return strtolower($tags['net']);
+
+	} else if (@$tags['radio'] != '' &&
+		in_array(strtolower($tags['radio']), $nets)) {
+		return strtolower($tags['radio']);
+
+	} else if (@$tags['tac']>0) {
+		return 'lte';
+
+	} else if (@$tags['cid']>0 || @$tags['cellid'] >= 65536) {
+		return 'umts';
+
+	} else {
+		return 'gsm';
+	}
+
+}
+
+function cellkey ($net) {
+	if ($net == 'gsm') {
+		return 'cellid';
+	} else {
+		return 'cid';
+	}
 }
 
 function distance ($lat1, $lon1, $lat2, $lon2) {
