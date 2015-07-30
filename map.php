@@ -37,47 +37,71 @@ try {
 
 	$cellids = array();
 	$cellids_by_node = array();
+	$elements = array();
+	$display = array(); // ezeket az azonosítókat fogjuk megjelentetni
+	$list = array(); // meg még ezeket
 
+	// beolvassuk a helyben tárolt cellaállományt
+	if (!isset($params['nocache'])) {
+		$json = file_get_contents('../geojson/overpass.json');
+		$data = json_decode($json, true);
+		if (is_array($data['elements']))
+			$elements = $data['elements'];
+
+		// ha nem lesz friss lekérdezés a befoglaló	téglalapra,
+		// ezekből választjuk ki a befoglalóra esőket
+		if (isset($params['noosm'])) {
+			foreach ($data['elements'] as $element) {
+				// csak a node-ok koordinátáit vizsgáljuk
+				// ami eléggé hanyag dolog,
+				// mert lehet hogy nincs mind bent
+				if ($element['type'] != 'node') continue;
+				if (!$osm->inBBOX($element['lat'], $element['lon'])) continue;
+				$id = $element['type'] . '#' . $element['id'];
+				$display[$id] = true;
+			}
+		}
+	}
+
+	// friss adatokat töltünk le a befoglaló téglalapból
 	if (!isset($params['noosm'])) {
 		$overpass = Overpass::query($osm->bbox);
 		$data = json_decode($overpass, true);
+		if (is_array($data['elements']))
+			$elements = array_merge($elements, $data['elements']);
 
-		foreach ($data['elements'] as $obj) {
-			if ($obj['type'] != 'node') continue;
-			$id = (string) $obj['id'];
-			$tags = $obj['tags'];
+		// ezeket mind megjelenítjük majd
+		foreach ($data['elements'] as $element) {
+			$id = $element['type'] . '#' . $element['id'];
+			$display[$id] = true;
+		}
+	}
 
-			// kiadjuk az eredetit
-			$node = new Node($obj['lat'], $obj['lon']);
-			$node->tags = $tags;
-			$node->id = $id;
-			$node->attr = $obj;
-			unset($node->attr['lat']);
-			unset($node->attr['lon']);
-			unset($node->attr['id']);
-			unset($node->attr['tags']);
-			$osm->nodes[] = $node;
+	$sites = array();
+	foreach ($elements as $element) {
+		$id = $element['type'] . '#' . $element['id'];
+		$sites[$id] = $element;
+		$tags = $element['tags'];
 
-			foreach ($nets as $net) {
-				$key = $net . ':cellid';
-				if (isset($tags[$key]) &&
-					isset($tags['MCC']) &&
-					isset($tags['MNC'])) {
+		foreach ($nets as $net) {
+			$key = $net . ':cellid';
+			if (isset($tags[$key]) &&
+				isset($tags['MCC']) &&
+				isset($tags['MNC'])) {
 
-					$ops = explode(' ', $tags[$key]);
-					$mcc = $tags['MCC'];
-					$mncs =  explode(';', $tags['MNC']);
-					if (count($ops) == count($mncs)) {
-						foreach ($mncs as $i => $mnc) {
-							$mnc = sprintf('%02d', trim($mnc));
-							$cidlist = $ops[$i];
-							$cids = explode(';', $cidlist);
-							foreach ($cids as $cid) {
-								$cid = trim($cid);
-								if ($cid == '') continue;
-								$cellids[$mcc][$mnc][$net][$cid] = $id;
-								$cellids_by_node[$id][$mcc][$mnc][$net][] = $cid;
-							}
+				$ops = explode(' ', $tags[$key]);
+				$mcc = $tags['MCC'];
+				$mncs =  explode(';', $tags['MNC']);
+				if (count($ops) == count($mncs)) {
+					foreach ($mncs as $i => $mnc) {
+						$mnc = sprintf('%02d', trim($mnc));
+						$cidlist = $ops[$i];
+						$cids = explode(';', $cidlist);
+						foreach ($cids as $cid) {
+							$cid = trim($cid);
+							if ($cid == '') continue;
+							$cellids[$mcc][$mnc][$net][$cid] = $id;
+							$cellids_by_node[$id][$mcc][$mnc][$net][] = $cid;
 						}
 					}
 				}
@@ -107,7 +131,7 @@ try {
 		ON measurements.mcc=cellids.mcc
 		AND measurements.mnc=cellids.mnc
 		AND measurements.site=cellids.site
-		-- AND measurements.rssi>-100
+		AND measurements.rssi>-113
 		ORDER BY measured", implode(' AND ', $where));
 
 	$result = pg_query($sql);
@@ -170,8 +194,10 @@ try {
 			if (!isset($cells[$id]['rssi']) || $cells[$id]['rssi'] < $node->tags['rssi']) $cells[$id]['rssi'] = $node->tags['rssi'];
 		}
 
-		// $osm->nodes[] = $node;
-		if (!isset($params['noraw'])) $osm->outputNode($node);
+		if (!isset($params['noraw']))
+			if (!isset($params['norawoutside']) ||
+				$osm->inBBOX($node->lat, $node->lon))
+					$osm->outputNode($node);
 		unset($node);
 
 	}
@@ -246,7 +272,6 @@ try {
 			$net = cellnet($cell->tags);
 			$key = cellkey($net);
 
-			$_nodeid = null;
 			$_nodeid = @$cellids
 				[$node->tags['MCC']]
 				[$node->tags['MNC']]
@@ -272,7 +297,8 @@ try {
 
 		// ha találtunk meglevő osm pontot, akkor azt használjuk
 		if ($nodeid !== null) {
-			$node->id = $nodeid;
+			$node->id = getNodeId($nodeid);
+			$display[$nodeid] = true;
 			// a node megy a levesbe, nem tesszük a térképre
 
 			$cells_at_node = $cellids_by_node
@@ -307,7 +333,8 @@ try {
 			if ($nodeid !== null) {
 				$net = cellnet($cell->tags);
 				$key = cellkey($net);
-				if (!in_array($cell->tags[$key], $cells_at_node[$net])) {
+				if (!isset($cells_at_node[$net]) ||
+					!in_array($cell->tags[$key], $cells_at_node[$net])) {
 					$way->tags['fixme'] = 'new cell';
 				}
 			}
@@ -315,6 +342,20 @@ try {
 			$osm->ways[] = $way;
 		}
 
+	}
+
+	// kibontjuk az esetleges hivatkozásokat
+	foreach ($display as $id => $dummy) {
+		addToList($id);
+	}
+
+	// hozzáadjuk a frissen kibontottakat
+	$display = array_merge($display, $list);
+
+	// megjelenítjük a hivatkozott osm azonostókat
+	foreach ($display as $id => $dummy) {
+		$element = $sites[$id];
+		$osm->addElement($element);
 	}
 
 	$osm->outputData();
@@ -386,5 +427,35 @@ function distance ($lat1, $lon1, $lat2, $lon2) {
 
 	$d = $R * $c;
 	return $d;
+
+}
+
+function getNodeId ($id) {
+	if (!preg_match('/^node#([0-9]+)$/', $id, $regs)) return false;
+	return $regs[1];
+}
+
+function addToList ($id) {
+
+	global $sites, $list;
+	$element = $sites[$id];
+
+	switch ($element['type']) {
+		case 'way':
+			foreach ($element['nodes'] as $nodeid) {
+				$id = 'node#' . $nodeid;
+				$list[$id] = true;
+			}
+			break;
+
+		case 'relation':
+			foreach ($element['members'] as $member) {
+				$id = $member['type'] . '#' . $member['id'];
+				$list[$id] = true;
+				addToList($id);
+				// rekurzív, reméljük nincs körkörös hivatkozás
+			}
+			break;
+	}
 
 }

@@ -32,6 +32,14 @@ class OSM extends Map {
 
 	}
 
+	function inBBOX ($lat, $lon) {
+		if ($lat < $this->bbox[1]) return false;
+		if ($lat > $this->bbox[3]) return false;
+		if ($lon < $this->bbox[0]) return false;
+		if ($lon > $this->bbox[2]) return false;
+		return true;
+	}
+
 	function header () {
 		header('Content-type: text/xml; charset=utf-8');
 		header('Content-disposition: attachment; filename=map.osm');
@@ -78,7 +86,9 @@ class OSM extends Map {
 			$attr['id'] = $way->id;
 			echo sprintf('<way %s >', $this->attrs($attr)), "\n";
 			foreach ($way->nodes as $node) {
-				echo sprintf('<nd ref="%s" />', $node->id), "\n";
+				// elfogadunk pusztán azonosítót is
+				$nodeid = is_a($node, 'Node') ? $node->id : $node;
+				echo sprintf('<nd ref="%s" />', $nodeid), "\n";
 			}
 			$this->print_tags($way->tags);
 			echo '</way>', "\n";
@@ -88,8 +98,8 @@ class OSM extends Map {
 
 	function outputRelations () {
 		if (is_array($this->relations)) foreach ($this->relations as $rel) {
-			if (isset($way->deleted)) continue;
-			$attr = $way->attr;
+			if (isset($rel->deleted)) continue;
+			$attr = $rel->attr;
 			$attr['id'] = $rel->id;
 			echo sprintf('<relation %s >', $this->attrs($attr)), "\n";
 			foreach ($rel->members as $member) {
@@ -128,4 +138,67 @@ class OSM extends Map {
 			echo sprintf('<tag k="%s" v="%s" />', htmlspecialchars(trim($k)), htmlspecialchars(trim($v))), "\n";
 		}
 	}
+
+	function addElement ($element) {
+		switch ($element['type']) {
+			case 'node':
+				$this->nodes[] = $this->createNode($element);
+				break;
+
+			case 'way':
+				$this->ways[] = $this->createWay($element);
+				break;
+
+			case 'relation':
+				$this->relations[] = $this->createRelation($element);
+				break;
+		}
+	}
+
+	// overpass json szerkezetű adatból osm node-ot készítünk
+	function createNode ($obj) {
+
+		$node = new Node($obj['lat'], $obj['lon']);
+		$node->tags = $obj['tags'];
+		$node->id = $obj['id'];
+		$node->attr = $obj;
+		unset($node->attr['lat']);
+		unset($node->attr['lon']);
+		unset($node->attr['id']);
+		unset($node->attr['tags']);
+
+		return $node;
+
+	}
+
+	// overpass json szerkezetű adatból osm node-ot készítünk
+	function createWay ($obj) {
+
+		$way = new Way();
+		$way->tags = $obj['tags'];
+		$way->id = $obj['id'];
+		$way->nodes = $obj['nodes'];
+		$way->attr = $obj;
+		unset($way->attr['id']);
+		unset($way->attr['tags']);
+		unset($way->attr['nodes']);
+		return $way;
+
+	}
+
+	// overpass json szerkezetű adatból osm node-ot készítünk
+	function createRelation ($obj) {
+
+		$relation = new Relation();
+		$relation->tags = $obj['tags'];
+		$relation->id = $obj['id'];
+		$relation->members = $obj['members'];
+		$relation->attr = $obj;
+		unset($relation->attr['id']);
+		unset($relation->attr['tags']);
+		unset($relation->attr['members']);
+		return $relation;
+
+	}
+
 }
