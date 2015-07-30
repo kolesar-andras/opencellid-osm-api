@@ -178,7 +178,7 @@ try {
 
 		if ($osm->bbox) {
 			// ha nagyon távoli rokont talált, azt hagyjuk (Telekom)
-			// ha a súylpont távolabb van befoglaló közepétől, mint a befoglaló átlója
+			// ha a súlypont távolabb van befoglaló közepétől, mint a befoglaló átlója
 			// vagy 20 kilométer
 			$clon = ($osm->bbox[0]+$osm->bbox[2])/2;
 			$clat = ($osm->bbox[1]+$osm->bbox[3])/2;
@@ -219,7 +219,8 @@ try {
 
 	$multiple_nodeids = array();
 	foreach ($locations as $id => $location) {
-		if (count($location['nodes']) == 1) continue;
+		// korábban nem jelentítettük meg a magányosakat
+		// if (count($location['nodes']) == 1) continue;
 
 		$lat = $location['lat'] / $location['weight'];
 		$lon = $location['lon'] / $location['weight'];
