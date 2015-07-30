@@ -146,12 +146,14 @@ try {
 		unset($tags['lat']);
 		unset($tags['lon']);
 		unset($tags['id']);
-		unset($tags['created']);
 		unset($tags['signal']);
 		unset($tags['site']);
 		unset($tags['cell']);
+		// unset($tags['created']);
 
-		$tags['measured'] = gmdate('Y-m-d\TH:i:s\Z', substr($row['measured'], 0, -3));
+		$tags['mnc'] = sprintf('%02d', $tags['mnc']);
+		$tags['measured'] = formatDateTime($tags['measured']);
+		$tags['created'] = formatDateTime($tags['created']);
 		$tags['rssi'] = rssi($row['signal']);
 		$cid = $tags['cellid'] & 65535;
 		$rnc = (int) floor($tags['cellid'] / 65536);
@@ -194,10 +196,18 @@ try {
 			if (!isset($cells[$id]['rssi']) || $cells[$id]['rssi'] < $node->tags['rssi']) $cells[$id]['rssi'] = $node->tags['rssi'];
 		}
 
-		if (!isset($params['noraw']))
-			if (!isset($params['norawoutside']) ||
-				$osm->inBBOX($node->lat, $node->lon))
-					$osm->outputNode($node);
+		if (isset($params['noraw'])) {
+		} else if (isset($params['norawoutside']) &&
+			!$osm->inBBOX($node->lat, $node->lon)) {
+		} else if (isset($params['norawtagged']) &&
+			isset($cellids
+				[$tags['mcc']]
+				[$tags['mnc']]
+				[$tags['net']]
+				[$tags[cellkey($tags['net'])]])) {
+		} else {
+			$osm->outputNode($node);
+		}
 		unset($node);
 
 	}
@@ -267,7 +277,7 @@ try {
 			$osm->nodes[] = $cell;
 
 			$node->tags['MCC'] = $cell->tags['mcc'];
-			$node->tags['MNC'] = sprintf('%02d', $cell->tags['mnc']);
+			$node->tags['MNC'] = $cell->tags['mnc'];
 			$node->tags['operator'] = $operators[$node->tags['MNC']];
 			$net = cellnet($cell->tags);
 			$key = cellkey($net);
@@ -458,4 +468,8 @@ function addToList ($id) {
 			break;
 	}
 
+}
+
+function formatDateTime ($timestamp) {
+	return gmdate('Y-m-d\TH:i:s\Z', substr($timestamp, 0, -3));
 }
