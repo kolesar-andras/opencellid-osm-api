@@ -7,23 +7,32 @@ meta
 	link: "http://terkep.turistautak.hu";
 }
 
-node[rssi>-75] {
+node[net=gsm][rssi>-75],
+node[net=umts][rssi>-100],
+node[net=lte][rssi>-110] {
 	symbol-size: 6;
 }
 
-node[rssi>-70] {
+node[net=gsm][rssi>-70],
+node[net=umts][rssi>-95],
+node[net=lte][rssi>-105] {
 	symbol-size: 8;
 }
 
-node[rssi>-65] {
+node[net=gsm][rssi>-65],
+node[net=umts][rssi>-90],
+node[net=lte][rssi>-100] {
 	symbol-size: 10;
 }
 
-node[rssi>-60] {
+node[net=gsm][rssi>-60],
+node[net=umts][rssi>-85],
+node[net=lte][rssi>-95] {
 	symbol-size: 12;
 }
 
-node[rssi>-50] {
+node[net=gsm][rssi>-50],
+node[net=umts][rssi>-80],
+node[net=lte][rssi>-90] {
 	symbol-size: 14;
 }
-
