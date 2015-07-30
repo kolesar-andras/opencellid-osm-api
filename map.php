@@ -40,16 +40,23 @@ try {
 
 	if (!isset($params['noosm'])) {
 		$overpass = Overpass::query($osm->bbox);
-		$osm->merge($overpass);
+		$data = json_decode($overpass, true);
 
-		$xml = simplexml_load_string($overpass);
-		foreach ($xml->node as $node) {
-			$n = $node->attributes();
-			$tags = array();
-			foreach ($node->tag as $tag) {
-				$t = $tag->attributes();
-				$tags[(string) $t['k']] = (string) $t['v'];
-			}
+		foreach ($data['elements'] as $obj) {
+			if ($obj['type'] != 'node') continue;
+			$id = (string) $obj['id'];
+			$tags = $obj['tags'];
+
+			// kiadjuk az eredetit
+			$node = new Node($obj['lat'], $obj['lon']);
+			$node->tags = $tags;
+			$node->id = $id;
+			$node->attr = $obj;
+			unset($node->attr['lat']);
+			unset($node->attr['lon']);
+			unset($node->attr['id']);
+			unset($node->attr['tags']);
+			$osm->nodes[] = $node;
 
 			foreach ($nets as $net) {
 				$key = $net . ':cellid';
@@ -68,8 +75,8 @@ try {
 							foreach ($cids as $cid) {
 								$cid = trim($cid);
 								if ($cid == '') continue;
-								$cellids[$mcc][$mnc][$net][$cid] = (string) $n['id'];
-								$cellids_by_node[(string) $n['id']][$mcc][$mnc][$net][] = $cid;
+								$cellids[$mcc][$mnc][$net][$cid] = $id;
+								$cellids_by_node[$id][$mcc][$mnc][$net][] = $cid;
 							}
 						}
 					}

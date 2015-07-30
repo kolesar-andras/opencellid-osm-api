@@ -15,7 +15,7 @@ class Overpass {
 		$bboxstr = sprintf('%1.7f,%1.7f,%1.7f,%1.7f',
 			$bbox[1], $bbox[0], $bbox[3], $bbox[2]);
 
-		$query = sprintf('[timeout:25];
+		$query = sprintf('[out:json][timeout:25];
 		(
 		  node["communication:mobile_phone"](%1$s);
 		  way["communication:mobile_phone"](%1$s);
