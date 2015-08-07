@@ -67,3 +67,19 @@ way[fixme] {
 	dashes: 8, 8;
 	width: 2;
 }
+
+node["mcc"]["tagged"] {
+	symbol-stroke-opacity: 0.02;
+	symbol-fill-opacity: 0.06;
+}
+
+node["[count]"]["tagged"] {
+	symbol-stroke-opacity: 0.2;
+	symbol-fill-opacity: 0.2;
+}
+
+way["tagged"] {
+	width: 1;
+	opacity: 0.2;
+}
+

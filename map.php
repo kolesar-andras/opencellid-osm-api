@@ -3,6 +3,10 @@
 /**
  * OpenCellID mérések letöltése osm fájlként
  *
+ * ezen felül:
+ * mérések alapján súlyozott cella-középpontok számítása
+ * azonos állomáshoz tartozó cellák összekapcsolása
+ *
  * @author Kolesár András <kolesar@turistautak.hu>
  * @since 2015.02.28
  *
@@ -40,6 +44,10 @@ try {
 	$elements = array();
 	$display = array(); // ezeket az azonosítókat fogjuk megjelentetni
 	$list = array(); // meg még ezeket
+
+	// ha nem kér ismert cellákat, méréseket sem kap rájuk
+	if (isset($params['nocelltagged']))
+		$params['norawtagged'] = true;
 
 	// beolvassuk a helyben tárolt cellaállományt
 	if (!isset($params['nocache'])) {
@@ -179,6 +187,13 @@ try {
 		$lat = $row['lat'];
 		$lon = $row['lon'];
 
+		if (isset($cellids
+			[$tags['mcc']]
+			[$tags['mnc']]
+			[$tags['net']]
+			[$tags[cellkey($tags['net'])]]))
+				$tags['tagged'] = 'yes';
+
 		$node = new Node($lat, $lon);
 		$node->tags = $tags;
 		$node->id = sprintf('9%012d', $row['id']);
@@ -195,16 +210,12 @@ try {
 			$cells[$id]['tags'] = $node->tags;
 			if (!isset($cells[$id]['rssi']) || $cells[$id]['rssi'] < $node->tags['rssi']) $cells[$id]['rssi'] = $node->tags['rssi'];
 		}
-
+		
 		if (isset($params['noraw'])) {
 		} else if (isset($params['norawoutside']) &&
 			!$osm->inBBOX($node->lat, $node->lon)) {
 		} else if (isset($params['norawtagged']) &&
-			isset($cellids
-				[$tags['mcc']]
-				[$tags['mnc']]
-				[$tags['net']]
-				[$tags[cellkey($tags['net'])]])) {
+			isset($node->tags['tagged'])) {
 		} else {
 			$osm->outputNode($node);
 		}
@@ -213,7 +224,7 @@ try {
 	}
 
 	$i = 0;
-	foreach ($cells as $id=> $cell) {
+	foreach ($cells as $id => $cell) {
 		if ($cell['count']<10) continue;
 
 		$lat = $cell['lat'] / $cell['weight'];
@@ -222,12 +233,12 @@ try {
 		if ($osm->bbox) {
 			// ha nagyon távoli rokont talált, azt hagyjuk (Telekom)
 			// ha a súlypont távolabb van befoglaló közepétől, mint a befoglaló átlója
-			// vagy 20 kilométer
+			// vagy 10 kilométer
 			$clon = ($osm->bbox[0]+$osm->bbox[2])/2;
 			$clat = ($osm->bbox[1]+$osm->bbox[3])/2;
 
 			$bsize = distance($osm->bbox[1], $osm->bbox[0], $osm->bbox[3], $osm->bbox[2]);
-			if ($bsize<20000) $bsize = 20000;
+			if ($bsize < 10000) $bsize = 10000;
 			if (distance($lat, $lon, $clat, $clon) > $bsize) continue;
 		}
 
@@ -245,6 +256,13 @@ try {
 		);
 		$node->id = '9' . str_replace(' ', '', $id);
 		$node->attr['version'] = '9999';
+
+		if (isset($cellids
+					[$cell['tags']['mcc']]
+					[$cell['tags']['mnc']]
+					[$cell['tags']['net']]
+					[$cell['tags'][cellkey($cell['tags']['net'])]]))
+			$node->tags['tagged'] = 'yes';
 
 		$cid = isset($node->tags['cid']) ? $node->tags['cid'] : $node->tags['cellid'];
 		$cid = floor($cid/10)*10;
@@ -274,6 +292,11 @@ try {
 
 		$nodeid = null;
 		foreach ($location['nodes'] as $cell) {
+
+			if (isset($params['nocelltagged']) &&
+				isset($cell->tags['tagged']))
+					continue;
+			
 			$osm->nodes[] = $cell;
 
 			$node->tags['MCC'] = $cell->tags['mcc'];
@@ -332,6 +355,11 @@ try {
 
 		// behúzzuk a vonalakat
 		foreach ($location['nodes'] as $cell) {
+
+			if (isset($params['nocelltagged']) &&
+				isset($cell->tags['tagged']))
+					continue;
+
 			$way = new Way;
 			$way->id = $cell->id;
 			$way->attr['version'] = '9999';
