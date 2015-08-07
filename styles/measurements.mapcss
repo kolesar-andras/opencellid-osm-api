@@ -76,6 +76,7 @@ node["mcc"]["tagged"] {
 node["[count]"]["tagged"] {
 	symbol-stroke-opacity: 0.2;
 	symbol-fill-opacity: 0.2;
+	text-opacity: 0.2;
 }
 
 way["tagged"] {
