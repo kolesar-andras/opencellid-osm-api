@@ -19,7 +19,7 @@ include_once('include/postgresql.conf.php');
 
 ini_set('display_errors', 1);
 ini_set('max_execution_time', 1800);
-ini_set('memory_limit', '1024M');
+ini_set('memory_limit', '2048M');
 mb_internal_encoding('UTF-8');
 
 $operators = array(
@@ -121,8 +121,8 @@ try {
 
 	$where = array();
 	if ($osm->bbox)
-		$where[] = sprintf("g && ST_Envelope(ST_GeomFromText(
-			'LINESTRING(%1.7f %1.7f, %1.7f %1.7f)'))",
+		$where[] = sprintf("g && ST_Envelope(ST_SetSRID(ST_GeomFromText(
+			'LINESTRING(%1.7f %1.7f, %1.7f %1.7f)'), 4326))",
 			$osm->bbox[0], $osm->bbox[1], $osm->bbox[2], $osm->bbox[3]);
 
 	if (is_numeric($params['mnc']))
