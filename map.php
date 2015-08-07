@@ -265,7 +265,7 @@ try {
 			$node->tags['tagged'] = 'yes';
 
 		$cid = isset($node->tags['cid']) ? $node->tags['cid'] : $node->tags['cellid'];
-		$cid = floor($cid/10)*10;
+		if ($cell['tags']['mnc'] != '30') $cid = floor($cid/10)*10;
 		$id = sprintf('%03d %02d %05d', $node->tags['mcc'], $node->tags['mnc'], $cid);
 
 		$weight = $cell['rssi'] + 90;
@@ -280,8 +280,6 @@ try {
 
 	$multiple_nodeids = array();
 	foreach ($locations as $id => $location) {
-		// korábban nem jelentítettük meg a magányosakat
-		// if (count($location['nodes']) == 1) continue;
 
 		$lat = $location['lat'] / $location['weight'];
 		$lon = $location['lon'] / $location['weight'];
@@ -339,6 +337,14 @@ try {
 				[$node->tags['MCC']]
 				[$node->tags['MNC']];
 
+		} else if (isset($params['nosingle']) &&
+			count($location['nodes']) == 1) {
+			// csak egy cella van a helyszínen
+			// és nincs hozzá meglevő pont
+			// és nem kérte az ilyeneket
+			// ezért nem készítünk neki feltételezett helyszínt
+			continue;
+			
 		} else {
 			foreach ($node->tags as $k => $v) {
 				if (is_array($v)) {
