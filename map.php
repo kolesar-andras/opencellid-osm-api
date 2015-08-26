@@ -128,6 +128,15 @@ try {
 	if (is_numeric($params['mnc']))
 		$where[] = sprintf('mnc=%d', $params['mnc']);
 
+	if (is_numeric($params['site']))
+		$where[] = sprintf('site=%d', $params['site']);
+
+	if (is_numeric($params['cell']))
+		$where[] = sprintf('cell=%d', $params['cell']);
+
+	if (in_array($params['net'], $nets))
+		$where[] = sprintf("net='%s'", $params['net']);
+
 	if (!count($where)) $where[] = '1=1';
 
 	$sql = sprintf("SELECT * FROM measurements
