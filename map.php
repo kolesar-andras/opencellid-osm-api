@@ -239,7 +239,9 @@ try {
 		$lat = $cell['lat'] / $cell['weight'];
 		$lon = $cell['lon'] / $cell['weight'];
 
-		if ($osm->bbox) {
+		// a Telekom összekapcsolásának letiltásával
+		// az alábbi feleslegessé vált
+		if (false && $osm->bbox) {
 			// ha nagyon távoli rokont talált, azt hagyjuk (Telekom)
 			// ha a súlypont távolabb van befoglaló közepétől, mint a befoglaló átlója
 			// vagy 10 kilométer
