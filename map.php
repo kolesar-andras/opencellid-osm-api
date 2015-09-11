@@ -141,13 +141,14 @@ try {
 
 	$sql = sprintf("SELECT * FROM measurements
 		INNER JOIN (
-			SELECT DISTINCT mcc, mnc, site
+			SELECT DISTINCT mcc, mnc, site, radio
 			FROM measurements
 			WHERE %s
 			) AS cellids
 		ON measurements.mcc=cellids.mcc
 		AND measurements.mnc=cellids.mnc
 		AND measurements.site=cellids.site
+		AND measurements.radio=cellids.radio
 		AND measurements.rssi>-113
 		ORDER BY measured", implode(' AND ', $where));
 
@@ -167,6 +168,15 @@ try {
 		unset($tags['site']);
 		unset($tags['cell']);
 		// unset($tags['created']);
+
+		// automatikus hibajavítás
+		if ($tags['mcc'] == 216 &&
+			$tags['mnc'] == 1 &&
+			$tags['lac'] >= 5000 &&
+			$tags['radio'] != 'LTE') {
+				$tags['radio:original'] = $tags['radio'];
+				$tags['radio'] = 'LTE';
+		}
 
 		$tags['mnc'] = sprintf('%02d', $tags['mnc']);
 		$tags['measured'] = formatDateTime($tags['measured']);
@@ -219,7 +229,7 @@ try {
 			$cells[$id]['tags'] = $node->tags;
 			if (!isset($cells[$id]['rssi']) || $cells[$id]['rssi'] < $node->tags['rssi']) $cells[$id]['rssi'] = $node->tags['rssi'];
 		}
-		
+
 		if (isset($params['noraw'])) {
 		} else if (isset($params['norawoutside']) &&
 			!$osm->inBBOX($node->lat, $node->lon)) {
@@ -276,8 +286,19 @@ try {
 			$node->tags['tagged'] = 'yes';
 
 		$cid = isset($node->tags['cid']) ? $node->tags['cid'] : $node->tags['cellid'];
-		if ($cell['tags']['mnc'] != '30') $cid = floor($cid/10)*10;
-		$id = sprintf('%03d %02d %05d', $node->tags['mcc'], $node->tags['mnc'], $cid);
+
+		// nem használható a 10-es alapú csoportosítás a Telekomnál
+		// valamint LTE celláknál sem sajnos
+		if ($cell['tags']['mnc'] != '30' && // Telekom
+			$cell['tags']['net'] != 'lte' // LTE
+			) {
+			$cid = floor($cid/10)*10;
+			$group = 0;
+		} else {
+			$group = 1;
+		}
+
+		$id = sprintf('%03d %02d %05d %d', $node->tags['mcc'], $node->tags['mnc'], $cid, $group);
 
 		$weight = $cell['rssi'] + 90;
 		if ($weight < 1) $weight = 1;
@@ -305,7 +326,7 @@ try {
 			if (isset($params['nocelltagged']) &&
 				isset($cell->tags['tagged']))
 					continue;
-			
+
 			$osm->nodes[] = $cell;
 
 			$node->tags['MCC'] = $cell->tags['mcc'];
@@ -355,7 +376,7 @@ try {
 			// és nem kérte az ilyeneket
 			// ezért nem készítünk neki feltételezett helyszínt
 			continue;
-			
+
 		} else {
 			foreach ($node->tags as $k => $v) {
 				if (is_array($v)) {
