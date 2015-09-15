@@ -139,18 +139,24 @@ try {
 
 	if (!count($where)) $where[] = '1=1';
 
-	$sql = sprintf("SELECT * FROM measurements
-		INNER JOIN (
-			SELECT DISTINCT mcc, mnc, site, radio
-			FROM measurements
-			WHERE %s
-			) AS cellids
-		ON measurements.mcc=cellids.mcc
-		AND measurements.mnc=cellids.mnc
-		AND measurements.site=cellids.site
-		AND measurements.radio=cellids.radio
-		AND measurements.rssi>-113
-		ORDER BY measured", implode(' AND ', $where));
+	if (isset($params['nocelloutside'])) {
+		$sql = sprintf("SELECT * FROM measurements
+			WHERE measurements.rssi>-113
+			AND %s", implode(' AND ', $where));
+
+	} else {
+		$sql = sprintf("SELECT * FROM measurements
+			INNER JOIN (
+				SELECT DISTINCT mcc, mnc, site, radio
+				FROM measurements
+				WHERE %s
+				) AS cellids
+			ON measurements.mcc=cellids.mcc
+			AND measurements.mnc=cellids.mnc
+			AND measurements.site=cellids.site
+			AND measurements.radio=cellids.radio
+			AND measurements.rssi>-113", implode(' AND ', $where));
+	}
 
 	$result = pg_query($sql);
 
