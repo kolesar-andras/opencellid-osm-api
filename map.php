@@ -188,24 +188,26 @@ try {
 		$tags['measured'] = formatDateTime($tags['measured']);
 		$tags['created'] = formatDateTime($tags['created']);
 		$tags['rssi'] = rssi($row['signal']);
-		$cid = $tags['cellid'] & 65535;
-		$rnc = (int) floor($tags['cellid'] / 65536);
-		if (is_numeric($tags['rnc'])) {
-			if ($tags['rnc'] <> $rnc) {
-				$tags['warning:rnc'] = 'rnc does not match cellid';
-			}
-		} else if ($rnc > 0) {
+		if ($tags['radio'] == 'UMTS') {
+			$cid = $tags['cellid'] & 65535;
+			$rnc = (int) floor($tags['cellid'] / 65536);
+			if (is_numeric($tags['rnc']))
+				if ($tags['rnc'] <> $rnc)
+					$tags['warning:rnc'] = 'rnc does not match cellid';
+			if (is_numeric($tags['cid']))
+				if ($tags['cid'] <> $cid)
+					$tags['warning:cid'] = 'cid does not match cellid';
+			$tags['cid'] = $cid;
 			$tags['rnc'] = $rnc;
 		}
 
-		if (is_numeric($tags['cid'])) {
-			if ($tags['cid'] <> $cid) {
-				$tags['warning:cid'] = 'cid does not match cellid';
-			}
-		} else if ($rnc > 0) { // nem elírás, csak akkor ha van rnc
+		if ($tags['radio'] == 'LTE') {
+			$eNB = (int) floor($tags['cellid'] / 256);
+			$ci = $tags['cellid'] & 255;
+			if ($ci > 9) continue; // ezeket egyelőre tévesnek kezeljük
+			$cid = $eNB*10 + $ci;
 			$tags['cid'] = $cid;
 		}
-
 		$cid = isset($tags['cid']) ? $tags['cid'] : $tags['cellid'];
 		$tags['net'] = cellnet($tags);
 		$net = array_search($tags['net'], $nets); // ez így szám lesz
@@ -294,10 +296,7 @@ try {
 		$cid = isset($node->tags['cid']) ? $node->tags['cid'] : $node->tags['cellid'];
 
 		// nem használható a 10-es alapú csoportosítás a Telekomnál
-		// valamint LTE celláknál sem sajnos
-		if ($cell['tags']['mnc'] != '30' && // Telekom
-			$cell['tags']['net'] != 'lte' // LTE
-			) {
+		if ($cell['tags']['mnc'] != '30') {
 			$cid = floor($cid/10)*10;
 			$group = 0;
 		} else {
