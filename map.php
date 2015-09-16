@@ -462,7 +462,7 @@ try {
 			// ha meglevő node, akkor figyelmeztetjük az új cellákra
 			if ($nodeid !== null) {
 				$net = cellnet($cell->tags);
-				$key = cellkey($net);
+				$key = 'cellid';
 				if (!isset($cells_at_node[$net]) ||
 					!in_array($cell->tags[$key], $cells_at_node[$net])) {
 					$way->tags['fixme'] = 'new cell';
