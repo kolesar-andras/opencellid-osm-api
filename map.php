@@ -99,7 +99,14 @@ try {
 
 				$ops = explode(' ', $tags[$key]);
 				$mcc = $tags['MCC'];
-				$mncs =  explode(';', $tags['MNC']);
+				$mncs = explode(';', $tags['MNC']);
+
+				if ($net == 'umts')
+					$rncs = explode(';', $tags['umts:RNC']);
+
+				if ($net == 'lte')
+					$eNBs = explode(';', $tags['umts:eNB']);
+
 				if (count($ops) == count($mncs)) {
 					foreach ($mncs as $i => $mnc) {
 						$mnc = sprintf('%02d', trim($mnc));
@@ -108,6 +115,20 @@ try {
 						foreach ($cids as $cid) {
 							$cid = trim($cid);
 							if ($cid == '') continue;
+							if (!is_numeric($cid)) continue;
+
+							if ($net == 'umts') {
+								$rnc = $rncs[$i];
+								if (!is_numeric($rnc)) continue;
+								$cid += $rnc*65536;
+							}
+
+							if ($net == 'lte') {
+								$eNB = $eNBs[$i];
+								if (!is_numeric($eNB)) continue;
+								$cid += $eNB*256;
+							}
+							
 							$cellids[$mcc][$mnc][$net][$cid] = $id;
 							$cellids_by_node[$id][$mcc][$mnc][$net][] = $cid;
 						}
@@ -188,9 +209,14 @@ try {
 		$tags['measured'] = formatDateTime($tags['measured']);
 		$tags['created'] = formatDateTime($tags['created']);
 		$tags['rssi'] = rssi($row['signal']);
+
+		if ($tags['radio'] == 'GSM') {
+			$tags['site'] = (int) floor($tags['cellid'] / 10);
+		}
+
 		if ($tags['radio'] == 'UMTS') {
 			$cid = $tags['cellid'] & 65535;
-			$rnc = (int) floor($tags['cellid'] / 65536);
+			$rnc = $tags['cellid'] >> 16;
 			if (is_numeric($tags['rnc']))
 				if ($tags['rnc'] <> $rnc)
 					$tags['warning:rnc'] = 'rnc does not match cellid';
@@ -199,16 +225,18 @@ try {
 					$tags['warning:cid'] = 'cid does not match cellid';
 			$tags['cid'] = $cid;
 			$tags['rnc'] = $rnc;
+			$tags['site'] = (int) floor($tags['cid'] / 10);
 		}
 
 		if ($tags['radio'] == 'LTE') {
-			$eNB = (int) floor($tags['cellid'] / 256);
-			$ci = $tags['cellid'] & 255;
-			if ($ci > 9) continue; // ezeket egyelőre tévesnek kezeljük
-			$cid = $eNB*10 + $ci;
-			$tags['cid'] = $cid;
+			$tags['cid'] = $tags['cellid'] & 255;
+			$tags['enb'] = $tags['cellid'] >> 8;
+			$tags['site'] = $tags['enb'];
 		}
-		$cid = isset($tags['cid']) ? $tags['cid'] : $tags['cellid'];
+
+		if ($tags['mnc'] == '30')
+			unset($tags['site']);
+
 		$tags['net'] = cellnet($tags);
 		$net = array_search($tags['net'], $nets); // ez így szám lesz
 		$lat = $row['lat'];
@@ -218,7 +246,7 @@ try {
 			[$tags['mcc']]
 			[$tags['mnc']]
 			[$tags['net']]
-			[$tags[cellkey($tags['net'])]]))
+			[$tags['cellid']]))
 				$tags['tagged'] = 'yes';
 
 		$node = new Node($lat, $lon);
@@ -226,7 +254,7 @@ try {
 		$node->id = sprintf('9%012d', $row['id']);
 		$node->attr = array('version' => '1');
 
-		$id = sprintf('%03d %02d %05d %d', $tags['mcc'], $tags['mnc'], $cid, $net);
+		$id = sprintf('%03d %02d %09d %d', $tags['mcc'], $tags['mnc'], $tags['cellid'], $net);
 		$weight = $tags['rssi'] + 90;
 		if ($weight < 1) $weight = 1;
 		if ($weight>0) {
@@ -280,8 +308,10 @@ try {
 			'lac' => $cell['tags']['lac'],
 			'cellid' => $cell['tags']['cellid'],
 			'rnc' => $cell['tags']['rnc'],
+			'enb' => $cell['tags']['enb'],
 			'cid' => $cell['tags']['cid'],
 			'net' => $cell['tags']['net'],
+			'site' => $cell['tags']['site'],
 		);
 		$node->id = '9' . str_replace(' ', '', $id);
 		$node->attr['version'] = '9999';
@@ -290,20 +320,18 @@ try {
 					[$cell['tags']['mcc']]
 					[$cell['tags']['mnc']]
 					[$cell['tags']['net']]
-					[$cell['tags'][cellkey($cell['tags']['net'])]]))
+					[$cell['tags']['cellid']]))
 			$node->tags['tagged'] = 'yes';
 
-		$cid = isset($node->tags['cid']) ? $node->tags['cid'] : $node->tags['cellid'];
-
-		// nem használható a 10-es alapú csoportosítás a Telekomnál
-		if ($cell['tags']['mnc'] != '30') {
-			$cid = floor($cid/10)*10;
+		if (isset($node->tags['site'])) {
+			$site = $node->tags['site'];
 			$group = 0;
 		} else {
+			$site = $node->tags['cellid'];
 			$group = 1;
 		}
 
-		$id = sprintf('%03d %02d %05d %d', $node->tags['mcc'], $node->tags['mnc'], $cid, $group);
+		$id = sprintf('%03d %02d %05d %d', $node->tags['mcc'], $node->tags['mnc'], $site, $group);
 
 		$weight = $cell['rssi'] + 90;
 		if ($weight < 1) $weight = 1;
@@ -349,6 +377,7 @@ try {
 			$node->tags[$net . ':cellid'][] = $cell->tags[$key];
 			$node->tags[$net . ':LAC'] = $cell->tags['lac'];
 			$node->tags[$net . ':RNC'] = $cell->tags['rnc'];
+			$node->tags[$net . ':eNB'] = $cell->tags['enb'];
 
 			// ha már volt választottunk és az más, mint amit most találtunk, ezt rögzítjük
 			if ($nodeid !== null && $_nodeid !== null && $nodeid = $_nodeid)
@@ -486,6 +515,7 @@ function cellnet ($tags) {
 }
 
 function cellkey ($net) {
+
 	if ($net == 'gsm') {
 		return 'cellid';
 	} else {
