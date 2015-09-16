@@ -128,7 +128,7 @@ try {
 								if (!is_numeric($eNB)) continue;
 								$cid += $eNB*256;
 							}
-							
+
 							$cellids[$mcc][$mnc][$net][$cid] = $id;
 							$cellids_by_node[$id][$mcc][$mnc][$net][] = $cid;
 						}
@@ -262,7 +262,12 @@ try {
 			@$cells[$id]['lon'] += $lon * $weight;
 			@$cells[$id]['weight'] += $weight;
 			@$cells[$id]['count'] ++;
-			$cells[$id]['tags'] = $node->tags;
+			@$cells[$id]['tags'] = $tags;
+
+			// számoljuk az előfordulásuokat, mert nem minden mérés helyes
+			foreach (array('lac') as $key)
+				@$cells[$id]['stats'][$key][$tags[$key]]++;
+
 			if (!isset($cells[$id]['rssi']) || $cells[$id]['rssi'] < $node->tags['rssi']) $cells[$id]['rssi'] = $node->tags['rssi'];
 		}
 
@@ -281,6 +286,20 @@ try {
 	$i = 0;
 	foreach ($cells as $id => $cell) {
 		if ($cell['count']<10) continue;
+
+		$tags = array();
+		foreach ($cell['stats'] as $key => $values) {
+			$out = array();
+			arsort($values, SORT_NUMERIC);
+			$index = 0;
+			foreach ($values as $value => $count) {
+				if (!$index) $tags[$key] = $value;
+				$out[] = sprintf('%s [%d]', $value, $count);
+				$index++;
+			}
+			if ($index>1) $tags[$key . ':stats'] = implode('; ', $out);
+		}
+		$cell['tags'] = array_merge($cell['tags'], $tags);
 
 		$lat = $cell['lat'] / $cell['weight'];
 		$lon = $cell['lon'] / $cell['weight'];
@@ -306,6 +325,7 @@ try {
 			'mcc' => $cell['tags']['mcc'],
 			'mnc' => $cell['tags']['mnc'],
 			'lac' => $cell['tags']['lac'],
+			'lac:stats' => $cell['tags']['lac:stats'],
 			'cellid' => $cell['tags']['cellid'],
 			'rnc' => $cell['tags']['rnc'],
 			'enb' => $cell['tags']['enb'],
