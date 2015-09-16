@@ -234,7 +234,7 @@ try {
 			$tags['site'] = $tags['enb'];
 		}
 
-		if ($tags['mnc'] == '30')
+		if ($tags['mnc'] == '30' && $tags['radio'] != 'LTE')
 			unset($tags['site']);
 
 		$tags['net'] = cellnet($tags);
