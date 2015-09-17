@@ -105,7 +105,7 @@ try {
 					$rncs = explode(';', $tags['umts:RNC']);
 
 				if ($net == 'lte')
-					$eNBs = explode(';', $tags['umts:eNB']);
+					$eNBs = explode(';', $tags['lte:eNB']);
 
 				if (count($ops) == count($mncs)) {
 					foreach ($mncs as $i => $mnc) {
@@ -114,7 +114,7 @@ try {
 						$cids = explode(';', $cidlist);
 						foreach ($cids as $cid) {
 							$cid = trim($cid);
-							if ($cid == '') continue;
+							if ($cid === '') continue;
 							if (!is_numeric($cid)) continue;
 
 							if ($net == 'umts') {
@@ -210,7 +210,10 @@ try {
 		$tags['created'] = formatDateTime($tags['created']);
 		$tags['rssi'] = rssi($row['signal']);
 
+		if ($tags['lac'] > 65530) continue; // hibás mérés
+
 		if ($tags['radio'] == 'GSM') {
+			if ($tags['cellid'] > 65535) continue; // hibás mérés
 			$tags['site'] = (int) floor($tags['cellid'] / 10);
 		}
 
@@ -225,12 +228,14 @@ try {
 					$tags['warning:cid'] = 'cid does not match cellid';
 			$tags['cid'] = $cid;
 			$tags['rnc'] = $rnc;
+			if ($tags['rnc'] == 0) continue; // hibás mérés
 			$tags['site'] = (int) floor($tags['cid'] / 10);
 		}
 
 		if ($tags['radio'] == 'LTE') {
 			$tags['cid'] = $tags['cellid'] & 255;
 			$tags['enb'] = $tags['cellid'] >> 8;
+			if ($tags['enb'] == 0) continue; // hibás mérés
 			$tags['site'] = $tags['enb'];
 		}
 
@@ -264,7 +269,7 @@ try {
 			@$cells[$id]['count'] ++;
 			@$cells[$id]['tags'] = $tags;
 
-			// számoljuk az előfordulásuokat, mert nem minden mérés helyes
+			// számoljuk az előfordulásokat, mert nem minden mérés helyes
 			foreach (array('lac') as $key)
 				@$cells[$id]['stats'][$key][$tags[$key]]++;
 
@@ -392,7 +397,7 @@ try {
 				[$node->tags['MCC']]
 				[$node->tags['MNC']]
 				[$net]
-				[$cell->tags[$key]];
+				[$cell->tags['cellid']];
 
 			$node->tags[$net . ':cellid'][] = $cell->tags[$key];
 			$node->tags[$net . ':LAC'] = $cell->tags['lac'];
