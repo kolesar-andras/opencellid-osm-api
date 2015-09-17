@@ -451,6 +451,7 @@ try {
 		}
 
 		// behúzzuk a vonalakat
+		$newcells = array();
 		foreach ($location['nodes'] as $cell) {
 
 			if (isset($params['nocelltagged']) &&
@@ -471,12 +472,57 @@ try {
 				if (!isset($cells_at_node[$net]) ||
 					!in_array($cell->tags[$key], $cells_at_node[$net])) {
 					$way->tags['fixme'] = 'new cell';
+					$newcells[$net][] = $cell->tags;
 				}
 			}
-
 			$osm->ways[] = $way;
 		}
 
+		if (!isset($params['noautotag'])) try {
+			// egyúttal hozzá is írjuk a ponthoz
+			$modified = false;
+			$tags = $sites[$nodeid]['tags'];
+			$multi = new MultiTag($tags, 'MNC', $node->tags['MNC']);
+
+			foreach ($newcells as $net => $cells) {
+				$cellidlist = $multi->getValue($net . ':cellid');
+
+				if (!preg_match('/[0-9];/', $cellidlist)) {
+					$list = array();
+				} else {
+					$list = explode(';', $cellidlist);
+				}
+
+				if (!count($list)) {
+					// kellenek a kísérők is
+					$multi->setCompareValue($net . ':LAC', $cells[0]['lac']);
+					if ($net == 'gsm') {
+						// nincs több
+					} else if ($net == 'umts') {
+						$multi->setCompareValue($net . ':RNC', $cells[0]['rnc']);
+					} else if ($net == 'lte') {
+						$multi->setCompareValue($net . ':eNB', $cells[0]['enb']);
+					}
+				}
+
+				// hozzáadjuk a cellákat
+				foreach ($cells as $cell)
+					$list[] = $cell['cid'];
+
+				sort($list);
+				$cellidlist = implode(';', $list);
+				$multi->setValue($net . ':cellid', $cellidlist);
+				$modified = true;
+			}
+
+			if ($modified) {
+				$sites[$nodeid]['action'] = 'modify';
+				$sites[$nodeid]['tags'] = $multi->getTags();
+			}
+
+		} catch (Exception $e) {
+			$sites[$nodeid]['tags']['warning'] = $e->getMessage();
+		}
 	}
 
 	// kibontjuk az esetleges hivatkozásokat
