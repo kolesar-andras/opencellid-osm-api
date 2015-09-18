@@ -39,6 +39,7 @@ try {
 	$osm->bbox(@$_REQUEST['bbox']);
 	$osm->header();
 
+	$siteids = array();
 	$cellids = array();
 	$cellids_by_node = array();
 	$elements = array();
@@ -117,6 +118,8 @@ try {
 							if ($cid === '') continue;
 							if (!is_numeric($cid)) continue;
 
+							$site = (int) floor($cid/10);
+
 							if ($net == 'umts') {
 								$rnc = $rncs[$i];
 								if (!is_numeric($rnc)) continue;
@@ -125,9 +128,16 @@ try {
 
 							if ($net == 'lte') {
 								$eNB = $eNBs[$i];
+								$site = $eNB;
 								if (!is_numeric($eNB)) continue;
 								$cid += $eNB*256;
 							}
+
+							if ($mcc == 30 && $net != 'lte')
+								$site = null;
+
+							if ($site !== null)
+								$siteids[$mcc][$mnc][$site] = $id;
 
 							$cellids[$mcc][$mnc][$net][$cid] = $id;
 							$cellids_by_node[$id][$mcc][$mnc][$net][] = $cid;
@@ -192,7 +202,7 @@ try {
 		unset($tags['lon']);
 		unset($tags['id']);
 		unset($tags['signal']);
-		unset($tags['site']);
+		unset($tags['site']); // TODO most már jó jön, használhatnánk
 		unset($tags['cell']);
 		// unset($tags['created']);
 
@@ -251,8 +261,15 @@ try {
 			[$tags['mcc']]
 			[$tags['mnc']]
 			[$tags['net']]
-			[$tags['cellid']]))
+			[$tags['cellid']])) {
 				$tags['tagged'] = 'yes';
+
+		} else if (isset($tags['site']) && isset($siteids
+			[$tags['mcc']]
+			[$tags['mnc']]
+			[$tags['site']])) {
+				$tags['tagged'] = 'auto';
+		}
 
 		$node = new Node($lat, $lon);
 		$node->tags = $tags;
@@ -280,7 +297,9 @@ try {
 		} else if (isset($params['norawoutside']) &&
 			!$osm->inBBOX($node->lat, $node->lon)) {
 		} else if (isset($params['norawtagged']) &&
-			isset($node->tags['tagged'])) {
+			@$node->tags['tagged'] == 'yes') {
+		} else if (isset($params['norawautotagged']) &&
+			@$node->tags['tagged'] == 'auto') {
 		} else {
 			$osm->outputNode($node);
 		}
@@ -337,16 +356,10 @@ try {
 			'cid' => $cell['tags']['cid'],
 			'net' => $cell['tags']['net'],
 			'site' => $cell['tags']['site'],
+			'tagged' => $cell['tags']['tagged'],
 		);
 		$node->id = '9' . str_replace(' ', '', $id);
 		$node->attr['version'] = '9999';
-
-		if (isset($cellids
-					[$cell['tags']['mcc']]
-					[$cell['tags']['mnc']]
-					[$cell['tags']['net']]
-					[$cell['tags']['cellid']]))
-			$node->tags['tagged'] = 'yes';
 
 		if (isset($node->tags['site'])) {
 			$site = $node->tags['site'];
