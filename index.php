@@ -51,7 +51,7 @@ foreach ($mods as $mod) {
 	}
 }
 
-if (isset($params['osm']) && !in_array($request, array('map', ''))) {
+if (!isset($params['noredirect']) && !in_array($request, array('map', ''))) {
 	$location = 'http://api.openstreetmap.org/api/' . $version . $request;
 	if ($url['query'] != '') $location .= '?' . $url['query'];
 
@@ -73,15 +73,15 @@ switch ($request) {
 	case 'changesets':
 		require_once('changesets.php');
 		break;
-		
+
 	case 'map':
 		require_once('map.php');
 		break;
-		
+
 	case 'map-dev':
 		require_once('map-dev.php');
 		break;
-		
+
 	case 'notes':
 		require_once('notes.php');
 		break;
@@ -89,14 +89,13 @@ switch ($request) {
 	case 'trackpoints':
 		require_once('trackpoints.php');
 		break;
-		
+
 	case '':
 		require_once('api.php');
 		break;
-		
+
 	default:
 		header('HTTP/1.0 404 Not Found');
 		echo '404 Not Found';
 		// file_put_contents('log', $_SERVER['REQUEST_URI'] . "\n", FILE_APPEND);
 }
-
