@@ -491,8 +491,12 @@ try {
 			$osm->ways[] = $way;
 		}
 
-		if (!isset($params['noautotag'])) try {
-			// egyúttal hozzá is írjuk a ponthoz
+		if (!isset($params['noautotag']) &&
+			!isset($params['noosm']) &&
+			$osm->inBBOX($sites[$nodeid]['lat'], $sites[$nodeid]['lon'])) try {
+			// ha élő adatokat használtunk
+			// és a torony a befoglaló téglalapon belül van
+			// akkor egyúttal hozzá is írjuk a ponthoz
 			$modified = false;
 			$tags = $sites[$nodeid]['tags'];
 			$multi = new MultiTag($tags, 'MNC', $node->tags['MNC']);
