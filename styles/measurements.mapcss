@@ -41,8 +41,10 @@ node[communication:mobile_phone=no] {
 
 node[communication:mobile_phone][man_made][gsm:cellid],
 node[communication:mobile_phone][man_made][umts:cellid],
+node[communication:mobile_phone][man_made][lte:cellid],
 node[communication:mobile_phone][location][gsm:cellid],
-node[communication:mobile_phone][location][umts:cellid] {
+node[communication:mobile_phone][location][umts:cellid],
+node[communication:mobile_phone][location][lte:cellid] {
 	icon-image: "http://kolesar.turistautak.hu/osm/styles/images/tower-green.png";
 	text: operator;
 }
@@ -84,3 +86,33 @@ way["tagged"] {
 	opacity: 0.2;
 }
 
+node["warning"]::circle {
+	symbol-shape: circle;
+	symbol-stroke-opacity: 1.0;
+	symbol-stroke-width: 3.0;
+	symbol-stroke-color: #ffff80;
+	symbol-size: 26;
+	symbol-fill-opacity: 1.0;
+	z-index: 1;
+}
+
+node[communication:mobile_phone]:modified::circle {
+	symbol-shape: circle;
+	symbol-stroke-opacity: 0.4;
+	symbol-stroke-width: 3.5;
+	symbol-stroke-color: #ffffff;
+	symbol-size: 30;
+	symbol-fill-opacity: 1.0;
+	z-index: 1;
+}
+
+node["warning"]::circle {
+	symbol-shape: circle;
+	symbol-stroke-opacity: 1.0;
+	symbol-stroke-width: 3.5;
+	symbol-stroke-color: #800000;
+	symbol-size: 30;
+	symbol-fill-opacity: 1.0;
+	symbol-fill-color: #ffffff;
+	z-index: 10;
+}
