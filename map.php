@@ -487,7 +487,7 @@ try {
 			foreach ($newcells as $net => $cells) {
 				$cellidlist = $multi->getValue($net . ':cellid');
 
-				if (!preg_match('/[0-9];/', $cellidlist)) {
+				if (!preg_match('/^[0-9;]+$/', $cellidlist)) {
 					$list = array();
 				} else {
 					$list = explode(';', $cellidlist);
@@ -507,7 +507,7 @@ try {
 
 				// hozzáadjuk a cellákat
 				foreach ($cells as $cell)
-					$list[] = $cell['cid'];
+					$list[] = $cell[$net == 'gsm' ? 'cellid' : 'cid'];
 
 				sort($list);
 				$cellidlist = implode(';', $list);
