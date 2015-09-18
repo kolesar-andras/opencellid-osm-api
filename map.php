@@ -492,10 +492,8 @@ try {
 		}
 
 		if (!isset($params['noautotag']) &&
-			!isset($params['noosm']) &&
 			$osm->inBBOX($sites[$nodeid]['lat'], $sites[$nodeid]['lon'])) try {
-			// ha élő adatokat használtunk
-			// és a torony a befoglaló téglalapon belül van
+			// ha a torony a befoglaló téglalapon belül van
 			// akkor egyúttal hozzá is írjuk a ponthoz
 			$modified = false;
 			$tags = $sites[$nodeid]['tags'];
