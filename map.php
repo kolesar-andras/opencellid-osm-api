@@ -506,16 +506,14 @@ try {
 					$list = explode(';', $cellidlist);
 				}
 
-				if (!count($list)) {
-					// kellenek a kísérők is
-					$multi->setCompareValue($net . ':LAC', $cells[0]['lac']);
-					if ($net == 'gsm') {
-						// nincs több
-					} else if ($net == 'umts') {
-						$multi->setCompareValue($net . ':RNC', $cells[0]['rnc']);
-					} else if ($net == 'lte') {
-						$multi->setCompareValue($net . ':eNB', $cells[0]['enb']);
-					}
+				$multi->setCompareValue($net . ':LAC', $cells[0]['lac']);
+				if ($net == 'gsm') {
+					// nincs több
+
+				} else if ($net == 'umts') {
+					$multi->setCompareValue($net . ':RNC', $cells[0]['rnc']);
+				} else if ($net == 'lte') {
+					$multi->setCompareValue($net . ':eNB', $cells[0]['enb']);
 				}
 
 				// hozzáadjuk a cellákat

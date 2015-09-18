@@ -40,8 +40,8 @@ class MultiTag {
 					)
 				);
 			}
+			return $values;
 		}
-		return $values;
 	}
 
 	function getValue ($key) {
@@ -77,7 +77,7 @@ class MultiTag {
 
 	function setCompareValue ($key, $value) {
 
-		$this->compareValue ($key, $value);
+		$this->compareValue($key, $value);
 		$this->setValue($key, $value);
 
 	}
