@@ -166,7 +166,8 @@ try {
 		$where[] = sprintf('cell=%d', $params['cell']);
 
 	if (in_array($params['net'], $nets))
-		$where[] = sprintf("net='%s'", $params['net']);
+		$where[] = sprintf("radio='%s'",
+			pg_escape_string($pg, strtoupper($params['net'])));
 
 	if (!count($where)) $where[] = '1=1';
 
