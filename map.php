@@ -133,7 +133,7 @@ try {
 								$cid += $eNB*256;
 							}
 
-							if ($mcc == 30 && $net != 'lte')
+							if ($mnc == 30 && $net != 'lte')
 								$site = null;
 
 							if ($site !== null)
