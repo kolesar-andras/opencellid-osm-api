@@ -203,7 +203,6 @@ try {
 		unset($tags['lon']);
 		unset($tags['id']);
 		unset($tags['signal']);
-		unset($tags['site']); // TODO most már jó jön, használhatnánk
 		unset($tags['cell']);
 		// unset($tags['created']);
 
@@ -226,7 +225,7 @@ try {
 			$tags['mnc'] == 30 &&
 			$tags['radio'] == 'UMTS' &&
 			($tags['rnc']<200 || $tags['rnc']>=300)) continue;
-
+			
 		$tags['mnc'] = sprintf('%02d', $tags['mnc']);
 		$tags['measured'] = formatDateTime($tags['measured']);
 		$tags['created'] = formatDateTime($tags['created']);
@@ -236,7 +235,6 @@ try {
 
 		if ($tags['radio'] == 'GSM') {
 			if ($tags['cellid'] > 65535) continue; // hibás mérés
-			$tags['site'] = (int) floor($tags['cellid'] / 10);
 		}
 
 		if ($tags['radio'] == 'UMTS') {
@@ -251,18 +249,13 @@ try {
 			$tags['cid'] = $cid;
 			$tags['rnc'] = $rnc;
 			if ($tags['rnc'] == 0) continue; // hibás mérés
-			$tags['site'] = (int) floor($tags['cid'] / 10);
 		}
 
 		if ($tags['radio'] == 'LTE') {
 			$tags['cid'] = $tags['cellid'] & 255;
 			$tags['enb'] = $tags['cellid'] >> 8;
 			if ($tags['enb'] == 0) continue; // hibás mérés
-			$tags['site'] = $tags['enb'];
 		}
-
-		if ($tags['mnc'] == '30' && $tags['radio'] != 'LTE')
-			unset($tags['site']);
 
 		$tags['net'] = cellnet($tags);
 		$net = array_search($tags['net'], $nets); // ez így szám lesz
