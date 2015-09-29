@@ -215,6 +215,17 @@ try {
 				$tags['radio:original'] = $tags['radio'];
 				$tags['radio'] = 'LTE';
 		}
+		
+		// hibás mérések kiszűrése
+		if ($tags['mcc'] == 216 &&
+			$tags['mnc'] == 30 &&
+			$tags['radio'] == 'UMTS' &&
+			$tags['lac'] != 1200) continue;
+
+		if ($tags['mcc'] == 216 &&
+			$tags['mnc'] == 30 &&
+			$tags['radio'] == 'UMTS' &&
+			($tags['rnc']<200 || $tags['rnc']>=300)) continue;
 
 		$tags['mnc'] = sprintf('%02d', $tags['mnc']);
 		$tags['measured'] = formatDateTime($tags['measured']);
