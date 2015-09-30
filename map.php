@@ -133,7 +133,7 @@ try {
 								$cid += $eNB*256;
 							}
 
-							if ($mnc == 30 && $net != 'lte')
+							if ($mnc == 30 && $net != 'lte') // TODO
 								$site = null;
 
 							if ($site !== null)
@@ -214,7 +214,7 @@ try {
 				$tags['radio:original'] = $tags['radio'];
 				$tags['radio'] = 'LTE';
 		}
-		
+
 		// hibás mérések kiszűrése
 		if ($tags['mcc'] == 216 &&
 			$tags['mnc'] == 30 &&
@@ -225,7 +225,7 @@ try {
 			$tags['mnc'] == 30 &&
 			$tags['radio'] == 'UMTS' &&
 			($tags['rnc']<200 || $tags['rnc']>=300)) continue;
-			
+
 		$tags['mnc'] = sprintf('%02d', $tags['mnc']);
 		$tags['measured'] = formatDateTime($tags['measured']);
 		$tags['created'] = formatDateTime($tags['created']);
@@ -366,12 +366,18 @@ try {
 		$node->id = '9' . str_replace(' ', '', $id);
 		$node->attr['version'] = '9999';
 
+		if ($node->tags['mcc'] == 216 &&
+			$node->tags['mnc'] == 30 &&
+			$node->tags['net'] !== 'lte') {
+			$group = 1;
+		} else {
+			$group = 0;
+		}
+
 		if (isset($node->tags['site'])) {
 			$site = $node->tags['site'];
-			$group = 0;
 		} else {
 			$site = $node->tags['cellid'];
-			$group = 1;
 		}
 
 		$id = sprintf('%03d %02d %05d %d', $node->tags['mcc'], $node->tags['mnc'], $site, $group);
