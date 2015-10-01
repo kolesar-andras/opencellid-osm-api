@@ -456,11 +456,16 @@ try {
 					if (implode(';', array_unique($node->tags[$net . ':PSC'])) == 'fixme')
 						unset($node->tags[$net . ':PSC']);
 
-				if (isset($node->tags[$net . ':cellid']))
-					array_multisort(
-						$node->tags[$net . ':cellid'],
-						$node->tags[$net . ':PSC'],
-						SORT_NUMERIC);
+				if (isset($node->tags[$net . ':cellid'])) {
+					if (isset($node->tags[$net . ':PSC'])) {
+						array_multisort(
+							$node->tags[$net . ':cellid'],
+							$node->tags[$net . ':PSC'],
+							SORT_NUMERIC);
+						} else {
+							sort($node->tags[$net . ':cellid'], SORT_NUMERIC);
+					}
+				}
 			}
 			foreach ($node->tags as $k => $v) {
 				if (is_array($v)) {
