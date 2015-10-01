@@ -165,28 +165,37 @@ try {
 	if (is_numeric($params['cell']))
 		$where[] = sprintf('cell=%d', $params['cell']);
 
+	if (is_numeric($params['lac']))
+		$where[] = sprintf('lac=%d', $params['lac']);
+
 	if (in_array($params['net'], $nets))
+		$where[] = sprintf("net='%s'",
+			pg_escape_string($pg, $params['net']));
+
+	if (in_array($params['radio'], $nets))
 		$where[] = sprintf("radio='%s'",
-			pg_escape_string($pg, strtoupper($params['net'])));
+			pg_escape_string($pg, $params['radio']));
 
 	if (!count($where)) $where[] = '1=1';
 
 	if (isset($params['nocelloutside'])) {
 		$sql = sprintf("SELECT * FROM measurements
 			WHERE measurements.rssi>-113
-			AND %s", implode(' AND ', $where));
+			AND %s
+			AND net IS NOT NULL", implode(' AND ', $where));
 
 	} else {
 		$sql = sprintf("SELECT * FROM measurements
 			INNER JOIN (
-				SELECT DISTINCT mcc, mnc, site, radio
+				SELECT DISTINCT mcc, mnc, site, net
 				FROM measurements
 				WHERE %s
+				AND net IS NOT NULL
 				) AS cellids
 			ON measurements.mcc=cellids.mcc
 			AND measurements.mnc=cellids.mnc
 			AND measurements.site=cellids.site
-			AND measurements.radio=cellids.radio
+			AND measurements.net=cellids.net
 			AND measurements.rssi>-113", implode(' AND ', $where));
 	}
 
@@ -206,38 +215,16 @@ try {
 		unset($tags['cell']);
 		// unset($tags['created']);
 
-		// automatikus hibajavítás
-		if ($tags['mcc'] == 216 &&
-			$tags['mnc'] == 1 &&
-			$tags['lac'] >= 5000 &&
-			$tags['radio'] != 'LTE') {
-				$tags['radio:original'] = $tags['radio'];
-				$tags['radio'] = 'LTE';
-		}
-
-		// hibás mérések kiszűrése
-		if ($tags['mcc'] == 216 &&
-			$tags['mnc'] == 30 &&
-			$tags['radio'] == 'UMTS' &&
-			$tags['lac'] != 1200) continue;
-
-		if ($tags['mcc'] == 216 &&
-			$tags['mnc'] == 30 &&
-			$tags['radio'] == 'UMTS' &&
-			($tags['rnc']<200 || $tags['rnc']>=300)) continue;
-
 		$tags['mnc'] = sprintf('%02d', $tags['mnc']);
 		$tags['measured'] = formatDateTime($tags['measured']);
 		$tags['created'] = formatDateTime($tags['created']);
 		$tags['rssi'] = rssi($row['signal']);
 
-		if ($tags['lac'] > 65530) continue; // hibás mérés
-
-		if ($tags['radio'] == 'GSM') {
+		if ($tags['net'] == 'gsm') {
 			if ($tags['cellid'] > 65535) continue; // hibás mérés
 		}
 
-		if ($tags['radio'] == 'UMTS') {
+		if ($tags['net'] == 'umts') {
 			$cid = $tags['cellid'] & 65535;
 			$rnc = $tags['cellid'] >> 16;
 			if (is_numeric($tags['rnc']))
@@ -251,7 +238,7 @@ try {
 			if ($tags['rnc'] == 0) continue; // hibás mérés
 		}
 
-		if ($tags['radio'] == 'LTE') {
+		if ($tags['net'] == 'lte') {
 			$tags['cid'] = $tags['cellid'] & 255;
 			$tags['enb'] = $tags['cellid'] >> 8;
 			if ($tags['enb'] == 0) continue; // hibás mérés
@@ -292,7 +279,7 @@ try {
 			@$cells[$id]['tags'] = $tags;
 
 			// számoljuk az előfordulásokat, mert nem minden mérés helyes
-			foreach (array('lac') as $key)
+			foreach (array('lac', 'psc') as $key)
 				@$cells[$id]['stats'][$key][$tags[$key]]++;
 
 			if (!isset($cells[$id]['rssi']) || $cells[$id]['rssi'] < $node->tags['rssi']) $cells[$id]['rssi'] = $node->tags['rssi'];
@@ -322,8 +309,8 @@ try {
 			arsort($values, SORT_NUMERIC);
 			$index = 0;
 			foreach ($values as $value => $count) {
-				if (!$index) $tags[$key] = $value;
-				$out[] = sprintf('%s [%d]', $value, $count);
+				if (!isset($tags[$key]) && $value) $tags[$key] = $value;
+				$out[] = sprintf('%s [%d]', $value === '' ? 'null' : $value, $count);
 				$index++;
 			}
 			if ($index>1) $tags[$key . ':stats'] = implode('; ', $out);
@@ -355,6 +342,8 @@ try {
 			'mnc' => $cell['tags']['mnc'],
 			'lac' => $cell['tags']['lac'],
 			'lac:stats' => $cell['tags']['lac:stats'],
+			'psc' => $cell['tags']['psc'],
+			'psc:stats' => $cell['tags']['psc:stats'],
 			'cellid' => $cell['tags']['cellid'],
 			'rnc' => $cell['tags']['rnc'],
 			'enb' => $cell['tags']['enb'],
@@ -424,6 +413,7 @@ try {
 				[$cell->tags['cellid']];
 
 			$node->tags[$net . ':cellid'][] = $cell->tags[$key];
+			$node->tags[$net . ':PSC'][] = $cell->tags['psc'] ? $cell->tags['psc'] : 'fixme';
 			$node->tags[$net . ':LAC'] = $cell->tags['lac'];
 			$node->tags[$net . ':RNC'] = $cell->tags['rnc'];
 			$node->tags[$net . ':eNB'] = $cell->tags['enb'];
@@ -461,8 +451,20 @@ try {
 			continue;
 
 		} else {
+			foreach ($nets as $net) {
+				if (isset($node->tags[$net . ':PSC']))
+					if (implode(';', array_unique($node->tags[$net . ':PSC'])) == 'fixme')
+						unset($node->tags[$net . ':PSC']);
+
+				if (isset($node->tags[$net . ':cellid']))
+					array_multisort(
+						$node->tags[$net . ':cellid'],
+						$node->tags[$net . ':PSC'],
+						SORT_NUMERIC);
+			}
 			foreach ($node->tags as $k => $v) {
 				if (is_array($v)) {
+					if (!preg_match('/(:cellid|:PSC)$/', $k))
 					if (is_numeric($v[0])) {
 						sort($v, SORT_NUMERIC);
 					} else {
