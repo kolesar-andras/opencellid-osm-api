@@ -3,22 +3,36 @@ meta
 	title: "cellid";
 	description: "style displaying OpenCellID measurements";
 	author: "Kolesár András";
-	version: "0.0.0.1";
-	link: "http://terkep.turistautak.hu";
+	version: "0.0.0.2";
+	link: "http://cellavadasz.openstreetmap.hu/";
 }
 
-node[cellid] {
-	symbol-fill-color: #808080;
-}
-
-node[cellid=~/1$/] {
+node[mcc=216][mnc=70][net=gsm][cellid=~/[147]$/],
+node[mcc=216][mnc=70][net=umts][cid=~/[147]$/],
+node[mcc=216][mnc=70][net=lte][cid=0],
+node[mcc=216][mnc=01][net=gsm][cellid=~/[16]$/],
+node[mcc=216][mnc=01][net=umts][cid=~/[16]$/]
+node[mcc=216][mnc=01][net=lte][cid=1] {
 	symbol-fill-color: #ff0000;
 }
 
-node[cellid=~/2$/] {
+node[mcc=216][mnc=70][net=gsm][cellid=~/[258]$/],
+node[mcc=216][mnc=70][net=umts][cid=~/[258]$/],
+node[mcc=216][mnc=70][net=lte][cid=1],
+node[mcc=216][mnc=01][net=gsm][cellid=~/[27]$/],
+node[mcc=216][mnc=01][net=umts][cid=~/[27]$/]
+node[mcc=216][mnc=01][net=lte][cid=2] {
 	symbol-fill-color: #00ff00;
 }
 
-node[cellid=~/3$/] {
+node[mcc=216][mnc=70][net=gsm][cellid=~/[369]$/],
+node[mcc=216][mnc=70][net=umts][cid=~/[369]$/],
+node[mcc=216][mnc=70][net=lte][cid=2],
+node[mcc=216][mnc=01][net=gsm][cellid=~/[38]$/],
+node[mcc=216][mnc=01][net=umts][cid=~/[38]$/]
+node[mcc=216][mnc=01][net=lte][cid=3] {
 	symbol-fill-color: #0000ff;
 }
+
+node[mcc=216]:selected { symbol-fill-color: #FFFF00; }
+

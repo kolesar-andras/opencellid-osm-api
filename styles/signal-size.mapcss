@@ -3,8 +3,8 @@ meta
 	title: "signal-size";
 	description: "style displaying OpenCellID measurements";
 	author: "Kolesár András";
-	version: "0.0.0.1";
-	link: "http://terkep.turistautak.hu";
+	version: "0.0.0.2";
+	link: "http://cellavadasz.openstreetmap.hu/";
 }
 
 node[net=gsm][rssi>-75],

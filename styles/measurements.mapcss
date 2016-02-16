@@ -4,7 +4,7 @@ meta
 	description: "style displaying OpenCellID measurements";
 	author: "Kolesár András";
 	version: "0.0.0.2";
-	link: "http://terkep.turistautak.hu";
+	link: "http://cellavadasz.openstreetmap.hu/";
 }
 
 node[mcc] {
@@ -17,6 +17,7 @@ node[mcc] {
 node[mcc=216][mnc=1] { symbol-fill-color: #00a9e3; }
 node[mcc=216][mnc=30] { symbol-fill-color: #000000; /* e20074 */ }
 node[mcc=216][mnc=70] { symbol-fill-color: #d5030b; }
+node[mcc=216]:selected { symbol-fill-color: #FFFF00; }
 
 node[man_made],
 node[location] {
@@ -54,15 +55,15 @@ node["[count]"] {
 	symbol-stroke-opacity: 1.0;
 	symbol-stroke-width: 1.5;
 	symbol-stroke-color: #ffffff;
-	symbol-size: 4;
+	symbol-size: 10;
 	symbol-fill-opacity: 1.0;
 	z-index: 1;
-	text: cellid;
-	font-size: 8;
+	text: eval(concat(tag("cellid"), " ", tag("net")));
+	font-size: 9;
 }
 
 node["[count]"][cid] {
-	text: cid;
+	text: eval(concat(tag("cid"), " ", tag("net")));
 }
 
 way[fixme] {

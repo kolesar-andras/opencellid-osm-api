@@ -3,8 +3,8 @@ meta
 	title: "signal-text";
 	description: "style displaying milestiones";
 	author: "Kolesár András";
-	version: "0.0.0.1";
-	link: "http://terkep.turistautak.hu";
+	version: "0.0.0.2";
+	link: "http://cellavadasz.openstreetmap.hu/";
 }
 
 node[rssi>-90] {
