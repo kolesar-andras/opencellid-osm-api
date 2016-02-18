@@ -301,7 +301,7 @@ try {
 
 	$i = 0;
 	foreach ($cells as $id => $cell) {
-		if ($cell['count']<10) continue;
+		if ($cell['count']<3) continue;
 
 		$tags = array();
 		foreach ($cell['stats'] as $key => $values) {
