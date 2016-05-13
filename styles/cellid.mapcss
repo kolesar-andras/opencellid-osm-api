@@ -23,7 +23,7 @@ node[mcc=216][mnc=70][net=lte][cid=1],
 node[mcc=216][mnc<=1][net=gsm][cellid=~/[27]$/],
 node[mcc=216][mnc<=1][net=umts][cid=~/[27]$/],
 node[mcc=216][mnc<=1][net=lte][cid=~/[27]$/],
-node[mcc=216][mnc=30][net=lte][cid=~/[17]$/] {
+node[mcc=216][mnc=30][net=lte][cid=~/[27]$/] {
 	symbol-fill-color: #00ff00;
 }
 
@@ -33,7 +33,7 @@ node[mcc=216][mnc=70][net=lte][cid=2],
 node[mcc=216][mnc<=1][net=gsm][cellid=~/[38]$/],
 node[mcc=216][mnc<=1][net=umts][cid=~/[38]$/],
 node[mcc=216][mnc<=1][net=lte][cid=~/[38]$/],
-node[mcc=216][mnc=30][net=lte][cid=~/[18]$/] {
+node[mcc=216][mnc=30][net=lte][cid=~/[38]$/] {
 	symbol-fill-color: #0000ff;
 }
 
