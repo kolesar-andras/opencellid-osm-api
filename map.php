@@ -180,8 +180,7 @@ try {
 
 	if (isset($params['nocelloutside'])) {
 		$sql = sprintf("SELECT * FROM measurements
-			WHERE measurements.rssi>-113
-			AND %s
+			WHERE %s
 			AND net IS NOT NULL", implode(' AND ', $where));
 
 	} else {
@@ -195,8 +194,7 @@ try {
 			ON measurements.mcc=cellids.mcc
 			AND measurements.mnc=cellids.mnc
 			AND measurements.site=cellids.site
-			AND measurements.net=cellids.net
-			AND measurements.rssi>-113", implode(' AND ', $where));
+			AND measurements.net=cellids.net", implode(' AND ', $where));
 	}
 
 	$result = pg_query($sql);
