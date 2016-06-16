@@ -148,7 +148,7 @@ try {
 	$pg = pg_connect(PG_CONNECTION_STRING);
 
 	$where = array();
-	if ($osm->bbox)
+	if ($osm->bbox && isset($params['nobbox'])) {
 		$where[] = sprintf("g && ST_Envelope(ST_SetSRID(ST_GeomFromText(
 			'LINESTRING(%1.7f %1.7f, %1.7f %1.7f)'), 4326))",
 			$osm->bbox[0], $osm->bbox[1], $osm->bbox[2], $osm->bbox[3]);
