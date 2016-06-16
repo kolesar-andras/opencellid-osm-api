@@ -162,6 +162,9 @@ try {
 	if (is_numeric($params['cell']))
 		$where[] = sprintf('cell=%d', $params['cell']);
 
+	if (is_numeric($params['cellid']))
+		$where[] = sprintf('cellid=%d', $params['cellid']);
+
 	if (is_numeric($params['lac']))
 		$where[] = sprintf('lac=%d', $params['lac']);
 
