@@ -196,7 +196,8 @@ try {
 			ON measurements.mcc=cellids.mcc
 			AND measurements.mnc=cellids.mnc
 			AND measurements.site=cellids.site
-			AND measurements.net=cellids.net", implode(' AND ', $where));
+			AND measurements.net=cellids.net
+			AND error IS NULL", implode(' AND ', $where));
 	}
 
 	$result = pg_query($sql);
