@@ -178,7 +178,8 @@ try {
 	if (isset($params['nocelloutside'])) {
 		$sql = sprintf("SELECT * FROM measurements
 			WHERE %s
-			AND net IS NOT NULL", implode(' AND ', $where));
+			AND net IS NOT NULL
+			AND error IS NULL", implode(' AND ', $where));
 
 	} else {
 		$sql = sprintf("SELECT * FROM measurements
@@ -187,6 +188,7 @@ try {
 				FROM measurements
 				WHERE %s
 				AND net IS NOT NULL
+				AND error IS NULL
 				) AS cellids
 			ON measurements.mcc=cellids.mcc
 			AND measurements.mnc=cellids.mnc
