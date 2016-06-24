@@ -514,7 +514,6 @@ try {
 			$osm->inBBOX($sites[$nodeid]['lat'], $sites[$nodeid]['lon'])) try {
 			// ha a torony a befoglaló téglalapon belül van
 			// akkor egyúttal hozzá is írjuk a ponthoz
-			$modified = false;
 			$tags = $sites[$nodeid]['tags'];
 			$multi = new MultiTag($tags, 'MNC', $node->tags['MNC']);
 
@@ -527,14 +526,15 @@ try {
 					$list = explode(';', $cellidlist);
 				}
 
-				$multi->setCompareValue($net . ':LAC', $cells[0]['lac']);
+				$multi->setValueIfEmpty($net . ':LAC', $cells[0]['lac']);
+
 				if ($net == 'gsm') {
 					// nincs több
 
 				} else if ($net == 'umts') {
-					$multi->setCompareValue($net . ':RNC', $cells[0]['rnc']);
+					$multi->setValueIfEmpty($net . ':RNC', $cells[0]['rnc']);
 				} else if ($net == 'lte') {
-					$multi->setCompareValue($net . ':eNB', $cells[0]['enb']);
+					$multi->setValueIfEmpty($net . ':eNB', $cells[0]['enb']);
 				}
 
 				// hozzáadjuk a cellákat
@@ -542,14 +542,15 @@ try {
 					$list[] = $cell[$net == 'gsm' ? 'cellid' : 'cid'];
 
 				sort($list);
+				$list = array_unique($list, SORT_NUMERIC);
 				$cellidlist = implode(';', $list);
 				$multi->setValue($net . ':cellid', $cellidlist);
-				$modified = true;
 			}
 
-			if ($modified) {
+			if ($newtags = $multi->getTags());
+			if ($newtags != $tags) {
 				$sites[$nodeid]['action'] = 'modify';
-				$sites[$nodeid]['tags'] = $multi->getTags();
+				$sites[$nodeid]['tags'] = $newtags;
 			}
 
 		} catch (Exception $e) {

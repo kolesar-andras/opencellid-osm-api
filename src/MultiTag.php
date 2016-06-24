@@ -51,6 +51,18 @@ class MultiTag {
 
 	}
 
+	function setValueIfEmpty ($key, $value) {
+
+		if ($this->getValue($key) != null) return;
+		$values = $this->getValues($key);
+		if (!count($values))
+			$values = array_fill(0, count($this->indexes), $this->fillvalue);
+
+		$values[$this->position] = $value;
+		$this->tags[$key] = implode('; ', $values);
+
+	}
+
 	function setValue ($key, $value) {
 
 		$values = $this->getValues($key);
