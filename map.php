@@ -35,20 +35,22 @@ $nets = array(
 );
 
 try {
+	// alapértelmezett beállítások
+	if (!isset($params['rawoutside'])) $params['norawoutside'] = true;
+	if (!isset($params['rawtagged'])) $params['norawtagged'] = true;
+	if (!isset($params['irregular'])) $params['noirregular'] = true;
+	if (!isset($params['celltagged'])) $params['nocelltagged'] = true;
+
 	$osm = new OSM;
 	$osm->bbox(@$_REQUEST['bbox']);
 	$osm->header();
 
-	$siteids = array();
-	$cellids = array();
-	$cellids_by_node = array();
-	$elements = array();
+	$siteids = array(); // [$mcc][$mnc][$site]
+	$cellids = array(); // [$mcc][$mnc][$net][$cellid]
+	$cellids_by_node = array(); // [$id][$mcc][$mnc][$net][]
+	$elements = array(); // osm objektumok gyorsítótárból vagy overpassról
 	$display = array(); // ezeket az azonosítókat fogjuk megjelentetni
 	$list = array(); // meg még ezeket
-
-	// ha nem kér ismert cellákat, méréseket sem kap rájuk
-	if (isset($params['nocelltagged']))
-		$params['norawtagged'] = true;
 
 	// beolvassuk a helyben tárolt cellaállományt
 	if (!isset($params['nocache'])) {
@@ -57,7 +59,7 @@ try {
 		if (is_array($data['elements']))
 			$elements = $data['elements'];
 
-		// ha nem lesz friss lekérdezés a befoglaló	téglalapra,
+		// ha nem lesz friss lekérdezés a befoglaló téglalapra,
 		// ezekből választjuk ki a befoglalóra esőket
 		if (isset($params['noosm'])) {
 			foreach ($data['elements'] as $element) {
@@ -86,10 +88,10 @@ try {
 		}
 	}
 
-	$sites = array();
+	$osmsites = array();
 	foreach ($elements as $element) {
 		$id = $element['type'] . '#' . $element['id'];
-		$sites[$id] = $element;
+		$osmsites[$id] = $element;
 		$tags = $element['tags'];
 
 		foreach ($nets as $net) {
@@ -107,36 +109,33 @@ try {
 				if (count($ops) == count($mncs)) {
 					foreach ($mncs as $i => $mnc) {
 						$mnc = sprintf('%02d', trim($mnc));
-						$cidlist = $ops[$i];
-						$cids = explode(';', $cidlist);
+						$cellidlist = $ops[$i];
 						foreach (explode(';', $eNBs[$i]) as $eNB) {
-							foreach ($cids as $cid) {
-								$cid = trim($cid);
-								if ($cid === '') continue;
-								if (!is_numeric($cid)) continue;
+							foreach (explode(';', $cellidlist) as $cellid) {
+								$cellid = trim($cellid);
+								if ($cellid === '') continue;
+								if (!is_numeric($cellid)) continue;
 
-								$site = (int) floor($cid/10);
+								$site = (int) floor($cellid/10);
 
 								if ($net == 'umts') {
 									$rnc = $rncs[$i];
 									if (!is_numeric($rnc)) continue;
-									$cid += $rnc*65536;
+									// $cellid += $rnc*65536;
 								}
 
 								if ($net == 'lte') {
-									$site = $eNB;
 									if (!is_numeric($eNB)) continue;
-									$cid += $eNB*256;
+									$site = $eNB;
+									// $cellid += $eNB*256;
 								}
 
-								if ($mnc == 30 && $net != 'lte') // TODO
-									$site = null;
+								if ($mnc == 30 && $net != 'lte')
+									$site = -$cellid;
 
-								if ($site !== null)
-									$siteids[$mcc][$mnc][$site] = $id;
-
-								$cellids[$mcc][$mnc][$net][$cid] = $id;
-								$cellids_by_node[$id][$mcc][$mnc][$net][] = $cid;
+								$siteids[$mcc][$mnc][$site] = $id;
+								$cellids[$mcc][$mnc][$site][$net][$cellid] = $id;
+								$cellids_by_node[$id][$mcc][$mnc][$site][$net][] = $cellid;
 							}
 						}
 					}
@@ -148,16 +147,22 @@ try {
 	$pg = pg_connect(PG_CONNECTION_STRING);
 
 	$where = array();
-	if ($osm->bbox && !isset($params['nobbox']))
-		$where[] = sprintf("g && ST_Envelope(ST_SetSRID(ST_GeomFromText(
+	$whereSite = array();
+	$whereBBOX = '1=1';
+	if ($osm->bbox && !isset($params['nobbox'])) {
+		$whereBBOX = sprintf("g && ST_Envelope(ST_SetSRID(ST_GeomFromText(
 			'LINESTRING(%1.7f %1.7f, %1.7f %1.7f)'), 4326))",
 			$osm->bbox[0], $osm->bbox[1], $osm->bbox[2], $osm->bbox[3]);
+	}
 
 	if (is_numeric($params['mnc']))
-		$where[] = sprintf('mnc=%d', $params['mnc']);
+		$whereSite[] = sprintf('mnc=%d', $params['mnc']);
 
 	if (is_numeric($params['site']))
-		$where[] = sprintf('site=%d', $params['site']);
+		$whereSite[] = sprintf('site=%d', $params['site']);
+
+	if ($params['noirregular'])
+		$whereSite[] = 'site > 0';
 
 	if (is_numeric($params['cell']))
 		$where[] = sprintf('cell=%d', $params['cell']);
@@ -169,7 +174,7 @@ try {
 		$where[] = sprintf('lac=%d', $params['lac']);
 
 	if (in_array($params['net'], $nets))
-		$where[] = sprintf("net='%s'",
+		$whereSite[] = sprintf("net='%s'",
 			pg_escape_string($pg, $params['net']));
 
 	if (in_array($params['radio'], $nets))
@@ -177,243 +182,247 @@ try {
 			pg_escape_string($pg, $params['radio']));
 
 	if (!count($where)) $where[] = '1=1';
+	if (!count($whereSite)) $whereSite[] = '1=1';
 
-	if (isset($params['nocelloutside'])) {
-		$sql = sprintf("SELECT * FROM measurements
-			WHERE %s
-			AND net IS NOT NULL
-			AND error IS NULL", implode(' AND ', $where));
+	if (!isset($params['noraw'])) {
+		if (isset($params['norawtagged'])) {
+			$norawtagged = "AND NOT EXISTS (
+				SELECT * FROM known.sites
+				WHERE sites.mcc = measurements.mcc
+				AND sites.mnc = measurements.mnc
+				AND sites.site = measurements.site
+			);";
+		} else {
+			$norawtagged = '';
+		}
 
-	} else {
-		$sql = sprintf("SELECT * FROM measurements
-			INNER JOIN (
-				SELECT DISTINCT mcc, mnc, site, net
-				FROM measurements
-				WHERE %s
+		if (!isset($params['norawoutside'])) {
+			$sql = sprintf("SELECT * FROM measurements
+				INNER JOIN (
+					SELECT mcc, mnc, site
+					FROM cells
+					WHERE %s
+					UNION
+					SELECT mcc, mnc, site
+					FROM sites
+					WHERE %s
+					UNION
+					SELECT mcc, mnc, site
+					FROM known.cells
+					WHERE %s
+				) AS sites
+				ON measurements.mcc=sites.mcc
+				AND measurements.mnc=sites.mnc
+				AND measurements.site=sites.site
 				AND net IS NOT NULL
 				AND error IS NULL
-				) AS cellids
-			ON measurements.mcc=cellids.mcc
-			AND measurements.mnc=cellids.mnc
-			AND measurements.site=cellids.site
-			AND measurements.net=cellids.net
-			AND error IS NULL", implode(' AND ', $where));
-	}
+				AND %s
+				AND %s
+				%s",
+					$whereBBOX,
+					$whereBBOX,
+					$whereBBOX,
+					implode(' AND ', $where),
+					implode(' AND ', $whereSite),
+					$norawtagged
+				);
+		} else {
+			$sql = sprintf("SELECT * FROM measurements
+				WHERE %s
+				AND %s
+				AND %s
+				AND net IS NOT NULL
+				AND error IS NULL
+				%s",
+					implode(' AND ', $where),
+					implode(' AND ', $whereSite),
+					$whereBBOX,
+					$norawtagged
+				);
+		}
+		$result = pg_query($sql);
+		while ($row = pg_fetch_assoc($result)) {
 
-	$result = pg_query($sql);
+			$tags = $row;
+			$tags['cellid'] = $tags['cell'];
+
+			$tags['measured'] = formatDateTime($tags['measured']);
+			$tags['created'] = formatDateTime($tags['created']);
+			$tags['mnc'] = sprintf('%02d', $tags['mnc']);
+
+			if ($tags['mnc'] != $tags['mnco'])
+				$tags['mnc:original'] = sprintf('%02d', $tags['mnco']);
+
+			unset($tags['g']);
+			unset($tags['lat']);
+			unset($tags['lon']);
+			unset($tags['id']);
+			unset($tags['signal']);
+			unset($tags['cell']);
+			unset($tags['mnco']);
+			unset($tags['cid']);
+
+			$net = array_search($tags['net'], $nets); // ez így szám lesz
+			$lat = $row['lat'];
+			$lon = $row['lon'];
+
+			if (isset($cellids
+				[$tags['mcc']]
+				[$tags['mnc']]
+				[$tags['site']]
+				[$tags['net']]
+				[$tags['cellid']])) {
+					$tags['tagged'] = 'yes';
+
+			} else if (isset($siteids
+				[$tags['mcc']]
+				[$tags['mnc']]
+				[$tags['site']])) {
+					$tags['tagged'] = 'auto';
+			}
+
+			$node = new Node($lat, $lon);
+			$node->tags = $tags;
+			$node->id = sprintf('9%012d', $row['id']);
+			$node->attr = array('version' => '1');
+
+			$id = sprintf('%03d %02d %09d %d',
+				$tags['mcc'],
+				$tags['mnc'],
+				$tags['cellid'],
+				$net
+			);
+
+			if (isset($params['norawtagged']) &&
+				@$node->tags['tagged'] == 'yes') {
+			} else if (isset($params['norawautotagged']) &&
+				@$node->tags['tagged'] == 'auto') {
+			} else {
+				$osm->outputNode($node);
+			}
+			unset($node);
+		}
+	}
 
 	$cells = array();
-	$locations = array();
+	$cellNodesBySite = array();
+	$sql = sprintf("SELECT * FROM (
+		SELECT cells.* FROM cells
+		INNER JOIN (
+			SELECT mcc, mnc, site
+			FROM cells
+			WHERE %s
+			UNION
+			SELECT mcc, mnc, site
+			FROM sites
+			WHERE %s
+			UNION
+			SELECT mcc, mnc, site
+			FROM known.cells
+			WHERE %s
+		) AS bbox
+		ON cells.mcc = bbox.mcc
+		AND cells.mnc = bbox.mnc
+		AND cells.site = bbox.site
+		) AS cells WHERE %s",
+			$whereBBOX, $whereBBOX, $whereBBOX, implode(' AND ', $whereSite)
+	);
 
-	while ($row = pg_fetch_assoc($result)) {
+	$result = pg_query($sql);
+	while ($cell = pg_fetch_assoc($result)) {
 
-		$tags = $row;
-		unset($tags['g']);
-		unset($tags['lat']);
-		unset($tags['lon']);
-		unset($tags['id']);
-		unset($tags['signal']);
-		unset($tags['cell']);
-		// unset($tags['created']);
+		$cell['mnc'] = sprintf('%02d', $cell['mnc']);
 
-		$tags['mnc'] = sprintf('%02d', $tags['mnc']);
-		$tags['measured'] = formatDateTime($tags['measured']);
-		$tags['created'] = formatDateTime($tags['created']);
-		$tags['rssi'] = rssi($row['signal']);
+		if ($cell['net'] == 'lte') $cell['enb'] = $cell['site'];
+		$net = array_search($cell['net'], $nets); // ez így szám lesz
+		$id = sprintf('%03d %02d %09d %d',
+			$cell['mcc'],
+			$cell['mnc'],
+			$cell['cell'],
+			$net
+		);
 
-		if ($tags['net'] == 'gsm') {
-			if ($tags['cellid'] > 65535) continue; // hibás mérés
-		}
-
-		if ($tags['net'] == 'umts') {
-			$cid = $tags['cellid'] & 65535;
-			$rnc = $tags['cellid'] >> 16;
-			if (is_numeric($tags['rnc']))
-				if ($tags['rnc'] <> $rnc)
-					$tags['warning:rnc'] = 'rnc does not match cellid';
-			if (is_numeric($tags['cid']))
-				if ($tags['cid'] <> $cid)
-					$tags['warning:cid'] = 'cid does not match cellid';
-			$tags['cid'] = $cid;
-			$tags['rnc'] = $rnc;
-			if ($tags['rnc'] == 0) continue; // hibás mérés
-		}
-
-		if ($tags['net'] == 'lte') {
-			$tags['cid'] = $tags['cellid'] & 255;
-			$tags['enb'] = $tags['cellid'] >> 8;
-			if ($tags['enb'] == 0) continue; // hibás mérés
-		}
-
-		$tags['net'] = cellnet($tags);
-		$net = array_search($tags['net'], $nets); // ez így szám lesz
-		$lat = $row['lat'];
-		$lon = $row['lon'];
-
-		if (isset($cellids
-			[$tags['mcc']]
-			[$tags['mnc']]
-			[$tags['net']]
-			[$tags['cellid']])) {
-				$tags['tagged'] = 'yes';
-
-		} else if (isset($tags['site']) && isset($siteids
-			[$tags['mcc']]
-			[$tags['mnc']]
-			[$tags['site']])) {
-				$tags['tagged'] = 'auto';
-		}
-
-		$node = new Node($lat, $lon);
-		$node->tags = $tags;
-		$node->id = sprintf('9%012d', $row['id']);
-		$node->attr = array('version' => '1');
-
-		$id = sprintf('%03d %02d %09d %d', $tags['mcc'], $tags['mnc'], $tags['cellid'], $net);
-		$weight = $tags['rssi'] + 90;
-		if ($weight < 1) $weight = 1;
-		if ($weight>0) {
-			@$cells[$id]['lat'] += $lat * $weight;
-			@$cells[$id]['lon'] += $lon * $weight;
-			@$cells[$id]['weight'] += $weight;
-			@$cells[$id]['count'] ++;
-			@$cells[$id]['tags'] = $tags;
-
-			// számoljuk az előfordulásokat, mert nem minden mérés helyes
-			foreach (array('lac', 'psc') as $key)
-				@$cells[$id]['stats'][$key][$tags[$key]]++;
-
-			if (!isset($cells[$id]['rssi']) || $cells[$id]['rssi'] < $node->tags['rssi']) $cells[$id]['rssi'] = $node->tags['rssi'];
-		}
-
-		if (isset($params['noraw'])) {
-		} else if (isset($params['norawoutside']) &&
-			!$osm->inBBOX($node->lat, $node->lon)) {
-		} else if (isset($params['norawtagged']) &&
-			@$node->tags['tagged'] == 'yes') {
-		} else if (isset($params['norawautotagged']) &&
-			@$node->tags['tagged'] == 'auto') {
-		} else {
-			$osm->outputNode($node);
-		}
-		unset($node);
-
-	}
-
-	$i = 0;
-	foreach ($cells as $id => $cell) {
-		if ($cell['count']<3) continue;
-
-		$tags = array();
-		foreach ($cell['stats'] as $key => $values) {
-			$out = array();
-			arsort($values, SORT_NUMERIC);
-			$index = 0;
-			foreach ($values as $value => $count) {
-				if (!isset($tags[$key]) && $value) $tags[$key] = $value;
-				$out[] = sprintf('%s [%d]', $value === '' ? 'null' : $value, $count);
-				$index++;
-			}
-			if ($index>1) $tags[$key . ':stats'] = implode('; ', $out);
-		}
-		$cell['tags'] = array_merge($cell['tags'], $tags);
-
-		$lat = $cell['lat'] / $cell['weight'];
-		$lon = $cell['lon'] / $cell['weight'];
-
-		// a Telekom összekapcsolásának letiltásával
-		// az alábbi feleslegessé vált
-		if (false && $osm->bbox) {
-			// ha nagyon távoli rokont talált, azt hagyjuk (Telekom)
-			// ha a súlypont távolabb van befoglaló közepétől, mint a befoglaló átlója
-			// vagy 10 kilométer
-			$clon = ($osm->bbox[0]+$osm->bbox[2])/2;
-			$clat = ($osm->bbox[1]+$osm->bbox[3])/2;
-
-			$bsize = distance($osm->bbox[1], $osm->bbox[0], $osm->bbox[3], $osm->bbox[2]);
-			if ($bsize < 10000) $bsize = 10000;
-			if (distance($lat, $lon, $clat, $clon) > $bsize) continue;
-		}
-
-		$node = new Node($lat, $lon);
+		$node = new Node($cell['lat'], $cell['lon']);
 		$node->tags = array(
-			'[count]' => $cell['count'],
+			'[count]' => $cell['measurements'],
 			'rssi' => $cell['rssi'],
-			'mcc' => $cell['tags']['mcc'],
-			'mnc' => $cell['tags']['mnc'],
-			'lac' => $cell['tags']['lac'],
-			'lac:stats' => $cell['tags']['lac:stats'],
-			'psc' => $cell['tags']['psc'],
-			'psc:stats' => $cell['tags']['psc:stats'],
-			'cellid' => $cell['tags']['cellid'],
-			'rnc' => $cell['tags']['rnc'],
-			'enb' => $cell['tags']['enb'],
-			'cid' => $cell['tags']['cid'],
-			'net' => $cell['tags']['net'],
-			'site' => $cell['tags']['site'],
-			'tagged' => $cell['tags']['tagged'],
+			'mcc' => $cell['mcc'],
+			'mnc' => $cell['mnc'],
+			'lac' => $cell['lac'],
+			'psc' => $cell['psc'],
+			'cellid' => $cell['cell'],
+			'rnc' => $cell['rnc'],
+			'enb' => $cell['enb'],
+			'net' => $cell['net'],
+			'site' => $cell['site'],
+			'tagged' => $cell['tagged'],
 		);
 		$node->id = '9' . str_replace(' ', '', $id);
 		$node->attr['version'] = '9999';
+		$cellNodesBySite[$cell['mcc']][$cell['mnc']][$cell['site']][] = $node;
+	}
 
-		if ($node->tags['mcc'] == 216 &&
-			$node->tags['mnc'] == 30 &&
-			$node->tags['net'] !== 'lte') {
+	$sites = array();
+	$multiple_nodeids = array();
+	$sql = sprintf("SELECT * FROM (
+		SELECT sites.* FROM sites
+		INNER JOIN (
+			SELECT mcc, mnc, site
+			FROM cells
+			WHERE %s
+			UNION
+			SELECT mcc, mnc, site
+			FROM sites
+			WHERE %s
+			UNION
+			SELECT mcc, mnc, site
+			FROM known.cells
+			WHERE %s
+		) AS bbox
+		ON sites.mcc = bbox.mcc
+		AND sites.mnc = bbox.mnc
+		AND sites.site = bbox.site
+		) AS sites WHERE %s",
+			$whereBBOX, $whereBBOX, $whereBBOX, implode(' AND ', $whereSite)
+	);
+	$result = pg_query($sql);
+	while ($site = pg_fetch_assoc($result)) {
+
+		$site['mnc'] = sprintf('%02d', $site['mnc']);
+
+		if ($site['site'] < 0) {
 			$group = 1;
 		} else {
 			$group = 0;
 		}
 
-		if (isset($node->tags['site'])) {
-			$site = $node->tags['site'];
-		} else {
-			$site = $node->tags['cellid'];
-		}
+		$id = sprintf('%03d %02d %05d %d',
+			$site['mcc'],
+			$site['mnc'],
+			abs($site['site']),
+			$group
+		);
 
-		$id = sprintf('%03d %02d %05d %d', $node->tags['mcc'], $node->tags['mnc'], $site, $group);
-
-		$weight = $cell['rssi'] + 90;
-		if ($weight < 1) $weight = 1;
-		@$locations[$id]['lat'] += $lat * $weight;
-		@$locations[$id]['lon'] += $lon * $weight;
-		@$locations[$id]['weight'] += $weight;
-		@$locations[$id]['count'] ++;
-		@$locations[$id]['nodes'][] = $node;
-
-	}
-
-	$multiple_nodeids = array();
-	foreach ($locations as $id => $location) {
-
-		$lat = $location['lat'] / $location['weight'];
-		$lon = $location['lon'] / $location['weight'];
-
-		$node = new Node($lat, $lon);
+		$node = new Node($site['lat'], $site['lon']);
 		$node->id = '8' . str_replace(' ', '', $id);
 		$node->attr['version'] = '9999';
 
 		$nodeid = null;
-		foreach ($location['nodes'] as $cell) {
-
-			if (isset($params['nocelltagged']) &&
-				isset($cell->tags['tagged']))
-					continue;
-
-			$osm->nodes[] = $cell;
+		foreach ($cellNodesBySite[$site['mcc']][$site['mnc']][$site['site']] as $cell) {
 
 			$node->tags['MCC'] = $cell->tags['mcc'];
 			$node->tags['MNC'] = $cell->tags['mnc'];
 			$node->tags['operator'] = $operators[$node->tags['MNC']];
-			$net = cellnet($cell->tags);
-			$key = cellkey($net);
+			$net = $cell->tags['net'];
 
 			$_nodeid = @$cellids
 				[$node->tags['MCC']]
 				[$node->tags['MNC']]
+				[$cell->tags['site']]
 				[$net]
 				[$cell->tags['cellid']];
 
-			$node->tags[$net . ':cellid'][] = $cell->tags[$key];
+			$node->tags[$net . ':cellid'][] = $cell->tags['cellid'];
 			$node->tags[$net . ':PSC'][] = $cell->tags['psc'] ? $cell->tags['psc'] : 'fixme';
 			$node->tags[$net . ':LAC'] = $cell->tags['lac'];
 			$node->tags[$net . ':RNC'] = $cell->tags['rnc'];
@@ -433,6 +442,7 @@ try {
 		}
 
 		// ha találtunk meglevő osm pontot, akkor azt használjuk
+		$cells_at_node = null;
 		if ($nodeid !== null) {
 			$node->id = getNodeId($nodeid);
 			$display[$nodeid] = true;
@@ -440,11 +450,12 @@ try {
 
 			$cells_at_node = $cellids_by_node
 				[$nodeid]
-				[$node->tags['MCC']]
-				[$node->tags['MNC']];
+				[$site['mcc']]
+				[$site['mnc']]
+				[$site['site']];
 
 		} else if (isset($params['nosingle']) &&
-			count($location['nodes']) == 1) {
+			count($cellNodesBySite[$site['mcc']][$site['mnc']][$site['site']]) == 1) {
 			// csak egy cella van a helyszínen
 			// és nincs hozzá meglevő pont
 			// és nem kérte az ilyeneket
@@ -484,11 +495,7 @@ try {
 
 		// behúzzuk a vonalakat
 		$newcells = array();
-		foreach ($location['nodes'] as $cell) {
-
-			if (isset($params['nocelltagged']) &&
-				isset($cell->tags['tagged']))
-					continue;
+		foreach ($cellNodesBySite[$site['mcc']][$site['mnc']][$site['site']] as $cell) {
 
 			$way = new Way;
 			$way->id = $cell->id;
@@ -499,22 +506,32 @@ try {
 
 			// ha meglevő node, akkor figyelmeztetjük az új cellákra
 			if ($nodeid !== null) {
-				$net = cellnet($cell->tags);
+				$net = $cell->tags['net'];
 				$key = 'cellid';
 				if (!isset($cells_at_node[$net]) ||
 					!in_array($cell->tags[$key], $cells_at_node[$net])) {
 					$way->tags['fixme'] = 'new cell';
 					$newcells[$net][] = $cell->tags;
+					if (!isset($params['noautotag'])) {
+						$way->tags['tagged'] = 'auto';
+						$cell->tags['tagged'] = 'auto';
+					}
+				} else {
+					$way->tags['tagged'] = 'yes';
+					$cell->tags['tagged'] = 'yes';
 				}
 			}
-			$osm->ways[] = $way;
+			if (!(isset($way->tags['tagged']) && isset($params['nocelltagged']))) {
+				$osm->nodes[] = $cell;
+				$osm->ways[] = $way;
+			}
 		}
 
 		if (!isset($params['noautotag']) &&
-			$osm->inBBOX($sites[$nodeid]['lat'], $sites[$nodeid]['lon'])) try {
+			$osm->inBBOX($osmsites[$nodeid]['lat'], $osmsites[$nodeid]['lon'])) try {
 			// ha a torony a befoglaló téglalapon belül van
 			// akkor egyúttal hozzá is írjuk a ponthoz
-			$tags = $sites[$nodeid]['tags'];
+			$tags = $osmsites[$nodeid]['tags'];
 			$multi = new MultiTag($tags, 'MNC', $node->tags['MNC']);
 
 			foreach ($newcells as $net => $cells) {
@@ -539,7 +556,7 @@ try {
 
 				// hozzáadjuk a cellákat
 				foreach ($cells as $cell)
-					$list[] = $cell[$net == 'gsm' ? 'cellid' : 'cid'];
+					$list[] = $cell['cellid'];
 
 				sort($list);
 				$list = array_unique($list, SORT_NUMERIC);
@@ -549,12 +566,12 @@ try {
 
 			if ($newtags = $multi->getTags());
 			if ($newtags != $tags) {
-				$sites[$nodeid]['action'] = 'modify';
-				$sites[$nodeid]['tags'] = $newtags;
+				$osmsites[$nodeid]['action'] = 'modify';
+				$osmsites[$nodeid]['tags'] = $newtags;
 			}
 
 		} catch (Exception $e) {
-			$sites[$nodeid]['tags']['warning'] = $e->getMessage();
+			$osmsites[$nodeid]['tags']['warning'] = $e->getMessage();
 		}
 	}
 
@@ -568,7 +585,7 @@ try {
 
 	// megjelenítjük a hivatkozott osm azonostókat
 	foreach ($display as $id => $dummy) {
-		$element = $sites[$id];
+		$element = $osmsites[$id];
 		$osm->addElement($element);
 	}
 
@@ -582,49 +599,10 @@ try {
 
 }
 
-function rssi ($signal) {
-	if ($signal == null) return null;
-	if ($signal > 60) return -$signal;
-	if ($signal < 0) return $signal;
-	return 2*$signal-113;
-}
-
 function cellid ($node1, $node2) {
 	if ($node1->tags['cellid']>$node2->tags['cellid']) return 1;
 	if ($node1->tags['cellid']<$node2->tags['cellid']) return -1;
 	return 0;
-}
-
-function cellnet ($tags) {
-	global $nets;
-
-	if (@$tags['net'] != '' &&
-		in_array(strtolower($tags['net']), $nets)) {
-		return strtolower($tags['net']);
-
-	} else if (@$tags['radio'] != '' &&
-		in_array(strtolower($tags['radio']), $nets)) {
-		return strtolower($tags['radio']);
-
-	} else if (@$tags['tac']>0) {
-		return 'lte';
-
-	} else if (@$tags['cid']>0 || @$tags['cellid'] >= 65536) {
-		return 'umts';
-
-	} else {
-		return 'gsm';
-	}
-
-}
-
-function cellkey ($net) {
-
-	if ($net == 'gsm') {
-		return 'cellid';
-	} else {
-		return 'cid';
-	}
 }
 
 function distance ($lat1, $lon1, $lat2, $lon2) {
@@ -636,8 +614,8 @@ function distance ($lat1, $lon1, $lat2, $lon2) {
 	$Δλ = ($lon2-$lon1) * pi() / 180;
 
 	$a = sin($Δφ/2) * sin($Δφ/2) +
-		    cos($φ1) * cos($φ2) *
-		    sin($Δλ/2) * sin($Δλ/2);
+			cos($φ1) * cos($φ2) *
+			sin($Δλ/2) * sin($Δλ/2);
 	$c = 2 * atan2(sqrt($a), sqrt(1-$a));
 
 	$d = $R * $c;
@@ -652,8 +630,8 @@ function getNodeId ($id) {
 
 function addToList ($id) {
 
-	global $sites, $list;
-	$element = $sites[$id];
+	global $osmsites, $list;
+	$element = $osmsites[$id];
 
 	switch ($element['type']) {
 		case 'way':

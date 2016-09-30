@@ -62,8 +62,8 @@ node["[count]"] {
 	font-size: 9;
 }
 
-node["[count]"][cid] {
-	text: eval(concat(tag("cid"), " ", tag("net")));
+node["[count]"][cellid] {
+	text: eval(concat(tag("cellid"), " ", tag("net")));
 }
 
 way[fixme] {
