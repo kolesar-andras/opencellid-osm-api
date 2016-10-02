@@ -6,6 +6,7 @@ class MultiTag {
 	var $indexkey; // key for index
 	var $index; // a value in indexkey
 	var $fillvalue = 'fixme'; // placeholder for missing values
+	var $nonevalue = 'none'; // placeholder for none value
 	var $indexes; // array of index values
 	var $position; // 0-based position of index at indexkey
 
@@ -29,7 +30,6 @@ class MultiTag {
 	}
 
 	function getValues ($key) {
-
 		if (isset($this->tags[$key])) {
 			$values = explode('; ', $this->tags[$key]);
 			if (count($this->indexes) != count($values)) {
@@ -45,41 +45,38 @@ class MultiTag {
 	}
 
 	function getValue ($key) {
-
 		$values = $this->getValues($key);
 		return @$values[$this->position];
+	}
 
+	function isEmpty ($key) {
+		$value = $this->getValue($key);
+		return $this->isValueEmpty($value);
+	}
+
+	function isValueEmpty ($value) {
+		if ($value === null) return true;
+		if ($value === $this->fillvalue) return true;
+		if ($value === $this->nonevalue) return true;
+		return false;
 	}
 
 	function setValueIfEmpty ($key, $value) {
-
-		if ($this->getValue($key) != null) return;
-		$values = $this->getValues($key);
-		if (!count($values))
-			$values = array_fill(0, count($this->indexes), $this->fillvalue);
-
-		$values[$this->position] = $value;
-		$this->tags[$key] = implode('; ', $values);
-
+		if ($this->isEmpty($key)) $this->setValue($key, $value);
 	}
 
 	function setValue ($key, $value) {
-
 		$values = $this->getValues($key);
 		if (!count($values))
 			$values = array_fill(0, count($this->indexes), $this->fillvalue);
 
 		$values[$this->position] = $value;
 		$this->tags[$key] = implode('; ', $values);
-
 	}
 
 	function compareValue ($key, $value) {
-
 		$current = $this->getValue($key);
-		if ($current === null) return;
-		if ($current == $this->fillvalue) return;
-		if ($current == 'none') return;
+		if ($this->isValueEmpty($current)) return;
 		if ($current != $value)
 			throw new Exception(
 				sprintf($key . ' mismatch (%s=%s: %s != %s)',
@@ -88,14 +85,11 @@ class MultiTag {
 	}
 
 	function setCompareValue ($key, $value) {
-
 		$this->compareValue($key, $value);
 		$this->setValue($key, $value);
-
 	}
 
 	function getTags () {
 		return $this->tags;
 	}
-
 }
