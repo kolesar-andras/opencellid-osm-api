@@ -38,6 +38,7 @@ try {
 	// alapértelmezett beállítások
 	if (!isset($params['rawoutside'])) $params['norawoutside'] = true;
 	if (!isset($params['rawtagged'])) $params['norawtagged'] = true;
+	if (!isset($params['rawautotagged'])) $params['norawautotagged'] = true;
 	if (!isset($params['irregular'])) $params['noirregular'] = true;
 	if (!isset($params['celltagged'])) $params['nocelltagged'] = true;
 
