@@ -339,7 +339,7 @@ try {
 		$id = sprintf('%03d %02d %09d %d',
 			$cell['mcc'],
 			$cell['mnc'],
-			$cell['cell'],
+			$cell['cellid'], // mind a 28 bit, mert különben nem egyedi
 			$net
 		);
 
