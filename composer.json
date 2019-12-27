@@ -5,11 +5,12 @@
     "authors": [
         {
             "name": "Kolesár András",
-            "email": "kolesar@turistautak.hu"
+            "email": "kolesar@openstreetmap.hu"
         }
     ],
-    "minimum-stability": "dev",
     "require": {
+        "league/csv": "^9.5",
+        "vlucas/phpdotenv": "^4.1"
     },
 	"autoload": {
 		"psr-4": {
