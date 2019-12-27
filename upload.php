@@ -28,11 +28,16 @@ $columns = [
     'mnc',
     'lac',
     'cellid',
+    'radio',
     'lon',
     'lat',
     'signal',
+    'speed',
+    'direction',
     'created',
     'measured',
+    'neighbour',
+    'file',
 ];
 
 $columnlist = implode(', ', $columns);
@@ -45,9 +50,14 @@ $pdo->query('BEGIN');
 foreach ($records as $record) {
     $record['cellid'] = $record['cell_id'];
     $record['signal'] = $record['dbm'];
+    $record['radio'] = $record['net_type'];
+    $record['direction'] = $record['bearing'];
+    $record['neighbour'] = $record['neighboring'];
     $record['created'] = time();
+    $record['file'] = -1;
     $record['measured'] = strtotime($record['measured_at']);
     $record = array_intersect_key($record, array_flip($columns));
     $statement->execute($record);
-    echo '.';
 }
+
+$pdo->query('COMMIT');
