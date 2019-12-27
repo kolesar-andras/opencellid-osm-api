@@ -16,8 +16,8 @@ if (isset($_SERVER['REQUEST_URI'])) {
 	$uri = @$argv[1];
 }
 
-if (preg_match('#^/osm/opencellid/#', $uri))
-	$uri = preg_replace('#^/osm/opencellid#', '', $uri);
+if (preg_match('#^/opencellid/#', $uri))
+	$uri = preg_replace('#^/opencellid#', '', $uri);
 
 $url = parse_url($uri);
 
