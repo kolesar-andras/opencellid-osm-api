@@ -54,8 +54,7 @@ class Overpass {
 		$opts = array('http' =>
 			array(
 				'method'  => 'POST',
-				'header'  => 'Content-type: application/x-www-form-urlencoded; charset=UTF-8'. "\n" .
-					'Content-Length: ' . strlen($postdata) . "\n",
+				'header'  => 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
 				'content' => $postdata,
 			)
 		);
@@ -64,7 +63,6 @@ class Overpass {
 
 		$url = 'http://overpass-api.de/api/interpreter';
 		$result = file_get_contents($url, false, $context);
-
 		return $result;
 	}
 }
