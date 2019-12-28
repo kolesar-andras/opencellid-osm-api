@@ -262,6 +262,7 @@ try {
 			unset($tags['cell']);
 			unset($tags['mnco']);
 			unset($tags['cid']);
+			unset($tags['file']);
 
 			$net = array_search($tags['net'], $nets); // ez így szám lesz
 			$lat = $row['lat'];
