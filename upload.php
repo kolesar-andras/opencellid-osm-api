@@ -16,8 +16,6 @@ $dotenv->load();
 $stream = STDIN;
 $csv = Reader::createFromStream($stream);
 $csv->setHeaderOffset(0);
-
-$header = $csv->getHeader(); // returns the CSV header record
 $records = $csv->getRecords(); // returns all the CSV records as an Iterator object
 
 $pdo = new PDO(getenv('DSN'));
