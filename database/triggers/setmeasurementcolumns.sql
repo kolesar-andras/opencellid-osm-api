@@ -54,6 +54,7 @@ if (new.net) IS NULL THEN
     new.net := CASE
         WHEN (
                 (new.mcc=216 AND new.mnc=01 AND new.lac BETWEEN 3000 AND 3999) OR
+                (new.mcc=216 AND new.mnc=03 AND new.lac BETWEEN 200 AND 299) OR
                 (new.mcc=216 AND new.mnc=30 AND new.lac BETWEEN 1 AND 999) OR
                 (new.mcc=216 AND new.mnc=70 AND new.lac BETWEEN 100 AND 199)
         )
@@ -73,6 +74,7 @@ if (new.net) IS NULL THEN
         WHEN (
                 (new.mcc=216 AND new.mnc=01 AND new.lac BETWEEN 5000 AND 5999) OR
                 (new.mcc=216 AND new.mnc=01 AND new.lac BETWEEN 20000 AND 39999) OR
+                (new.mcc=216 AND new.mnc=03 AND new.lac BETWEEN 100 AND 199) OR
                 (new.mcc=216 AND new.mnc=30) OR
                 (new.mcc=216 AND new.mnc=70 AND new.lac BETWEEN 3000 AND 3999)
         )

@@ -29,7 +29,6 @@ $columns = [
     'lac',
     'cellid',
     'radio',
-    'net',
     'lon',
     'lat',
     'signal',
@@ -52,7 +51,6 @@ foreach ($records as $record) {
     $record['cellid'] = $record['cell_id'];
     $record['signal'] = $record['dbm'];
     $record['radio'] = $record['net_type'];
-    $record['net'] = strtolower($record['radio']);
     $record['direction'] = $record['bearing'];
     $record['neighbour'] = $record['neighboring'];
     $record['created'] = round(microtime(true)*1000);
