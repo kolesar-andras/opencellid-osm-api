@@ -13,7 +13,8 @@ node[mcc=216][mnc=70][net=lte][cellid=0],
 node[mcc=216][mnc<=1][net=gsm][cellid=~/[16]$/],
 node[mcc=216][mnc<=1][net=umts][cellid=~/[16]$/],
 node[mcc=216][mnc<=1][net=lte][cellid=~/[16]$/],
-node[mcc=216][mnc=30][net=lte][cellid=~/[16]$/] {
+node[mcc=216][mnc=30][net=lte][cellid=~/[16]$/],
+node[mcc=216][mnc="03"][net=lte][cellid=~/[12]$/] {
 	symbol-fill-color: #ff0000;
 }
 
@@ -23,7 +24,8 @@ node[mcc=216][mnc=70][net=lte][cellid=1],
 node[mcc=216][mnc<=1][net=gsm][cellid=~/[27]$/],
 node[mcc=216][mnc<=1][net=umts][cellid=~/[27]$/],
 node[mcc=216][mnc<=1][net=lte][cellid=~/[27]$/],
-node[mcc=216][mnc=30][net=lte][cellid=~/[27]$/] {
+node[mcc=216][mnc=30][net=lte][cellid=~/[27]$/],
+node[mcc=216][mnc="03"][net=lte][cellid=~/[34]$/] {
 	symbol-fill-color: #00ff00;
 }
 
@@ -33,7 +35,8 @@ node[mcc=216][mnc=70][net=lte][cellid=2],
 node[mcc=216][mnc<=1][net=gsm][cellid=~/[38]$/],
 node[mcc=216][mnc<=1][net=umts][cellid=~/[38]$/],
 node[mcc=216][mnc<=1][net=lte][cellid=~/[38]$/],
-node[mcc=216][mnc=30][net=lte][cellid=~/[38]$/] {
+node[mcc=216][mnc=30][net=lte][cellid=~/[38]$/],
+node[mcc=216][mnc="03"][net=lte][cellid=~/[56]$/] {
 	symbol-fill-color: #0000ff;
 }
 
