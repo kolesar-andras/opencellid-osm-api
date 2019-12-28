@@ -13,8 +13,8 @@ use League\Csv\Reader;
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
-//load the CSV document from a file path
-$csv = Reader::createFromPath('sample.csv', 'r');
+$stream = STDIN;
+$csv = Reader::createFromStream($stream);
 $csv->setHeaderOffset(0);
 
 $header = $csv->getHeader(); // returns the CSV header record
