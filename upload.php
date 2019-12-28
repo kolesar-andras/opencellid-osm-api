@@ -29,6 +29,7 @@ $columns = [
     'lac',
     'cellid',
     'radio',
+    'net',
     'lon',
     'lat',
     'signal',
@@ -51,11 +52,12 @@ foreach ($records as $record) {
     $record['cellid'] = $record['cell_id'];
     $record['signal'] = $record['dbm'];
     $record['radio'] = $record['net_type'];
+    $record['net'] = strtolower($record['radio']);
     $record['direction'] = $record['bearing'];
     $record['neighbour'] = $record['neighboring'];
-    $record['created'] = time();
+    $record['created'] = round(microtime(true)*1000);
     $record['file'] = -1;
-    $record['measured'] = strtotime($record['measured_at']);
+    $record['measured'] = round((new DateTime($record['measured_at']))->format('U.u'))*1000;
     $record = array_intersect_key($record, array_flip($columns));
     $statement->execute($record);
 }
