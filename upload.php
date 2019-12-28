@@ -43,6 +43,7 @@ $pdo->query('BEGIN');
 
 while (!feof($stream)) {
     $values = fgetcsv($stream);
+    if ($values === false) break;
     $record = array_combine($header, $values);
     $record['cellid'] = $record['cell_id'];
     $record['signal'] = $record['dbm'];
