@@ -8,15 +8,11 @@ set_error_handler(function ($severity, $message, $file, $line) {
     throw new ErrorException($message, $severity, $severity, $file, $line);
 });
 
-use League\Csv\Reader;
-
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->load();
 
 $stream = STDIN;
-$csv = Reader::createFromStream($stream);
-$csv->setHeaderOffset(0);
-$records = $csv->getRecords(); // returns all the CSV records as an Iterator object
+$header = fgetcsv($stream);
 
 $pdo = new PDO(getenv('DSN'));
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -45,7 +41,9 @@ $statement = $pdo->prepare($sql);
 
 $pdo->query('BEGIN');
 
-foreach ($records as $record) {
+while (!feof($stream)) {
+    $values = fgetcsv($stream);
+    $record = array_combine($header, $values);
     $record['cellid'] = $record['cell_id'];
     $record['signal'] = $record['dbm'];
     $record['radio'] = $record['net_type'];
