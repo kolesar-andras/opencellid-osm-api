@@ -41,9 +41,16 @@ $statement = $pdo->prepare($sql);
 
 $pdo->query('BEGIN');
 
+$lineNumber = 0;
+$headerCount = count($header);
 while (!feof($stream)) {
+    $lineNumber++;
     $values = fgetcsv($stream);
     if ($values === false) break;
+    if ($headerCount != count($values)) {
+        echo 'warning: field count does not match headers in line #' . $lineNumber, PHP_EOL;
+        continue;
+    }
     $record = array_combine($header, $values);
     $record['cellid'] = $record['cell_id'];
     $record['signal'] = $record['dbm'];
